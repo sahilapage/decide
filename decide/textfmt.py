@@ -252,6 +252,7 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
 # grounded 1.00 -> 0.91). So for long articles only, the encoder reads the
 # sentences the draft leans on. The model already trains on trimmed articles
 # (augment kb_trim); the number/scope flags still use the full article.
+KB_FOCUS_ABOVE = 5          # 4 + one stray sentence is handled by the model (augment kb_distractor)
 KB_MAX_SENTS = 4
 KB_MIN_SCORE = 4.0          # summed rarity of shared terms (one rare word ~ 4-6)
 _KB_SENT = re.compile(r"(?<=[.!?])\s+")
@@ -279,7 +280,7 @@ def _idf() -> dict:
 def focus_kb(draft: str, kb: str) -> str:
     """Long KB article -> the sentences that share the draft's rarer words or numbers (order kept)."""
     sents = [s for s in _KB_SENT.split(kb.strip()) if s]
-    if len(sents) <= KB_MAX_SENTS:
+    if len(sents) <= KB_FOCUS_ABOVE:
         return kb
     idf = _idf()
     d = kb_terms(draft)

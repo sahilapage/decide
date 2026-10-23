@@ -100,9 +100,15 @@ def num_words(t, rng):
     return t
 
 
+# the four phrases that always block approval in the data (found by approve rate 0 under the cap)
+DISQUALIFY = re.compile(r"dispute a charge|outside your usual policy|raised something similar|signed up recently"
+                        r"|\b(free|pro|enterprise)\b", re.I)  # tier mentions could contradict the tier field
+
+
 def plain_sents(rows):
-    """Body sentences with no digits or money, safe to move between tickets."""
-    return [x for r in rows for x in sents(r["state"]["body"]) if not re.search(r"[\d$]", x) and len(x) > 15]
+    """Body sentences with no digits, money or approve-blocking phrase: safe to move between tickets."""
+    return [x for r in rows for x in sents(r["state"]["body"])
+            if not re.search(r"[\d$]", x) and not DISQUALIFY.search(x) and len(x) > 15]
 
 
 def kb_filler(s, kbs, rng, k):
