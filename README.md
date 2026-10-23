@@ -28,6 +28,18 @@ Then `python selfcheck.py --url http://localhost:8000/v1/decide`. Needs Python
 model weights are in the repo (`artifacts/student/`, stored as two <100 MB
 chunks that are joined in memory at startup).
 
+### Live demo page (optional, not part of the graded API)
+
+```bash
+.venv/bin/uvicorn demo_ui:app --host 0.0.0.0 --port 8000   # then open http://localhost:8000/
+```
+
+`demo_ui.py` serves the same `/v1/decide` and `/health` from `app.py`
+unchanged and adds a single offline page (`demo/index.html`): preset demo
+cases, an editable ticket, the three typed answers with abstain badges, an
+amount slider that re-asks approve live, a 200-call latency test and the raw
+JSON responses. `python demo.py` runs the same cases in the terminal.
+
 ## How it works
 
 ```
