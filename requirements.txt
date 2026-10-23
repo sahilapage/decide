@@ -1,12 +1,11 @@
-# Serving (CPU only). Bounded rather than hard-pinned so pip picks a wheel
-# that matches the judges' Python; the versions we ran are in the README.
+# Serving (CPU only): exactly what the request path imports. Bounded rather than
+# hard-pinned so pip picks a wheel that matches the judges' Python; the versions
+# we ran are in the README. Offline copies: GitHub release wheels-v1 (start.sh).
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.32,<1.0
 numpy>=1.26,<3.0
 onnxruntime>=1.20,<2.0
 tokenizers>=0.20,<1.0
-# only needed for the gate-1 baseline fallback and for fitting the policy
-scikit-learn>=1.5,<2.0
-scipy>=1.11,<2.0
 
-# Training (GPU box only, not needed to serve): see requirements-train.txt
+# Training / calibration fitting / the gate-1 baseline fallback need more:
+# see requirements-train.txt (adds scikit-learn, scipy, torch, transformers).
