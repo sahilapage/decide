@@ -81,11 +81,10 @@ def main():
     if args.save_policy:
         pol.save(args.save_policy)
     if args.save_soft:
-        c = pol.cfg
         np.savez(args.save_soft,
-                 route_prob=softmax(oof["route"] / c["T_route"]),
-                 approve_prob=sigmoid(c["a_appr"] * oof["approve"] + c["b_appr"]),
-                 grounded_prob=sigmoid(c["a_gr"] * oof["grounded"] + c["b_gr"]),
+                 route_prob=pol.route_probs(oof["route"]),
+                 approve_prob=pol.p_approve(oof["approve"]),
+                 grounded_prob=pol.p_grounded(oof["grounded"]),
                  seen=m)
         print("saved teacher targets to", args.save_soft)
 

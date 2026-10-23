@@ -1,4 +1,4 @@
-# Decide — one shared decision model, three typed answers, ~5 ms on CPU
+# Decide — one shared decision model, three typed answers, ~3 ms on CPU
 
 `POST /v1/decide` answers three typed questions about a support ticket —
 **route** (5-way choice), **approve** (yes/no under a 3:1 cost) and
@@ -7,14 +7,14 @@ encoder, calibrated probabilities and a deliberate abstain policy, on CPU only,
 with no network calls.
 
 <!-- RESULTS:START -->
-| | dev (1,500 tickets, 4,500 calls) |
+| dev split, via `selfcheck.py` against the live service | |
 |---|---|
-| route | acc 0.893, macro-F1 (answered) 0.944 |
-| approve | cost 0.211 vs always-hold 0.382 (3:1) |
-| grounded | acc 0.997, macro-F1 (answered) 1.000 |
-| mean ECE | 0.023 |
-| p95 latency | 5.5 ms (Apple M5, 4 threads) / 15.8 ms (i9-13900K pinned to 4 cores) |
-| selfcheck total | 84.6 / 100 |
+| route | acc 0.883, macro-F1 (answered) 0.943, coverage 0.89 |
+| approve | cost 0.191 vs always-hold 0.374 (3:1), coverage 0.85 |
+| grounded | acc 1.000, macro-F1 1.000, coverage 1.00 |
+| mean ECE / Brier skill | 0.023 / 0.806 |
+| p95 latency (mean of 3 decisions) | 2.5 ms over HTTP (Apple M5); 5.4 ms in-process on 2 physical cores of an i9-13900K |
+| **selfcheck total** | **85.2 / 100** (cross-fitted estimate 84.7, see model card) |
 <!-- RESULTS:END -->
 
 ## Start it (one command)
@@ -25,8 +25,20 @@ with no network calls.
 
 Then `python selfcheck.py --url http://localhost:8000/v1/decide`. Needs Python
 3.10+ on a CPU-only Linux box; no GPU, no network after `pip install`. The
-model weights are in the repo (`artifacts/student/`, stored as two <100 MB
+model weights are in the repo (`artifacts/student/`, 68 MB, stored in <100 MB
 chunks that are joined in memory at startup).
+
+### Live demo page (optional, not part of the graded API)
+
+```bash
+.venv/bin/uvicorn demo_ui:app --host 0.0.0.0 --port 8000   # then open http://localhost:8000/
+```
+
+`demo_ui.py` serves the same `/v1/decide` and `/health` from `app.py`
+unchanged and adds a single offline page (`demo/index.html`): preset demo
+cases, an editable ticket, the three typed answers with abstain badges, an
+amount slider that re-asks approve live, a 200-call latency test and the raw
+JSON responses. `python demo.py` runs the same cases in the terminal.
 
 ## How it works
 
@@ -40,13 +52,13 @@ chunks that are joined in memory at startup).
    "grounded: <draft>" [SEP] "<kb>"       ┘
                       │
           ┌───────────▼────────────┐
-          │  shared encoder         │   Ettin-32M (ModernBERT recipe), fine-tuned
+          │  shared encoder         │   Ettin-17M (ModernBERT recipe), fine-tuned
           │  (one ONNX graph)       │   multi-task on all three decisions
           └───────────┬────────────┘
                  mean-pool h
         ┌─────────────┼─────────────────────┐
    route head     approve head            grounded head
-   Linear→5     MLP([h, tier×amount])      Linear→1
+   Linear→5     MLP([h, aux])          MLP([h, aux]) + w·flags
         │             │                     │
    temperature     Platt, approve iff     Platt, p > 0.5
    scaling         p > 0.75 (3:1 cost)
@@ -80,7 +92,17 @@ parameters for a binary question), trained on top of the same encoder.
   one slot — a number ("fifteen" vs "thirty minutes"), an audience
   ("administrators" vs "all users") or a scope ("monthly" vs "annual"). So the
   draft and the article go into the encoder **together** as a pair (a
-  cross-encoder), never embedded separately, and numbers are normalised first.
+  cross-encoder), never embedded separately.
+  * Every duration is normalised to one unit using the data's own conventions
+    ("a month" = 30 days, "six months" = 180 days, "a year" = 365 days,
+    "a quarter of an hour" = 15 minutes, "one thousand" = 1000). Before this,
+    most confident grounding errors were the encoder failing at unit
+    arithmetic ("a month" vs "sixty days").
+  * After normalisation, **no supported draft in train or dev states a
+    number + unit (or range like "3-5 business days") that its article does
+    not**. Three number-consistency features (any unsupported number, how
+    many, share supported) go into the grounded head next to the encoder
+    output. The encoder handles the non-numeric slots.
 * **approve** depends on more than words: per-tier amount caps and a few
   disqualifying phrases, plus account history the ticket never mentions. The
   approve head sees the pooled text *and* a tabular vector (tier one-hot,
@@ -89,9 +111,18 @@ parameters for a binary question), trained on top of the same encoder.
 
 ### Calibration and abstention
 
-* Probabilities are calibrated per decision (temperature for route, Platt
-  scaling for the binaries) on **out-of-fold** predictions from 5-fold
-  training, never on dev.
+* Calibration is label-noise aware. About 5-6% of routing labels are
+  unrelated to the ticket text, so even the clearest ticket is right only ~95%
+  of the time; plain temperature scaling cannot express that plateau. Route
+  uses `p = (1-eps)·softmax(z/T + bias) + eps/5`; the binaries use Platt
+  scaling with a learned floor and ceiling (`lo + (hi-lo)·sigmoid(a·z+b)`),
+  because ~20% of approvable requests are refused for account-history reasons.
+  On 6,500 cross-fitted out-of-fold predictions this raises the calibration
+  score from 0.832 to 0.858 (total +0.65).
+* The structural noise parameters (eps, bias, floor, ceiling) are fitted on
+  the 6,500 out-of-fold predictions; only the scales (T, a, b) are refitted on
+  the shipped model's own dev predictions, and the dev numbers we report are
+  cross-fitted (fit on one half of dev, score the other).
 * Abstention is tuned per decision against an in-process copy of the judges'
   scorer (`decide/scoring.py`, built from `selfcheck.py`'s own functions):
   for each decision we search abstain shares up to 18.5% and keep the
@@ -104,20 +135,20 @@ parameters for a binary question), trained on top of the same encoder.
 ```bash
 pip install -r requirements-train.txt                       # GPU box
 python train_baseline.py                                    # gate-1 sparse baseline
-python train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32s --prompt short        # 5-fold OOF
-python train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32s_full --full --prompt short
-python eval_runs.py runs/e32s --save_policy runs/e32s_policy.json
-python export_onnx.py runs/e32s_full exports/e32s
-python pack_student.py exports/e32s runs/e32s_policy.json
-python bench_cpu.py exports/e32s                            # latency + ONNX/PyTorch parity
+M=jhu-clsp/ettin-encoder-17m
+python train_mt.py --model $M --out runs/v5_e17 --epochs 6 --lr 1e-4 --prompt short          # 5-fold OOF
+python train_mt.py --model $M --out runs/v5h_e17_s3 --full --epochs 6 --lr 1e-4 --prompt short --seed 3
+./finalize.sh runs/v5_e17 runs/v5h_e17_s3 exports/final_e17_s3   # calibrate, export, benchmark
+python pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
 ```
 
 ## Pretrained components and licences
 
 | Component | Used for | Licence |
 |---|---|---|
-| [jhu-clsp/ettin-encoder-32m](https://huggingface.co/jhu-clsp/ettin-encoder-32m) | shipped student backbone | MIT |
-| [jhu-clsp/ettin-encoder-150m / -400m](https://huggingface.co/jhu-clsp) | teachers (training only) | MIT |
+| [jhu-clsp/ettin-encoder-17m](https://huggingface.co/jhu-clsp/ettin-encoder-17m) | **shipped backbone** | MIT |
+| [jhu-clsp/ettin-encoder-32m](https://huggingface.co/jhu-clsp/ettin-encoder-32m) | compared, same quality, 2.7x slower | MIT |
+| [jhu-clsp/ettin-encoder-150m / -400m](https://huggingface.co/jhu-clsp) | teachers (training experiments only) | MIT |
 | [microsoft/deberta-v3-large](https://huggingface.co/microsoft/deberta-v3-large) | teacher (training only) | MIT |
 | [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya) encoder | teacher init (training only) | Apache-2.0 |
 

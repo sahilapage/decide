@@ -3,8 +3,11 @@ The shared network: one transformer encoder, three small typed heads.
 
     encoder(prompt + state)  ->  mean-pooled vector h        (shared, ~all params)
     route head     Linear(h) -> 5 logits                      (choice)
-    approve head   MLP([h, tabular]) -> 1 logit               (binary)
-    grounded head  Linear(h) -> 1 logit                       (binary)
+    approve head   MLP([h, aux]) -> 1 logit                   (binary)
+    grounded head  MLP([h, aux]) -> 1 logit                   (binary)
+
+aux = tier one-hot, tier x amount bucket, log amount (read by approve) and
+three number-consistency features of draft vs article (read by grounded).
 
 All three heads run on every call (they are a few thousand parameters each);
 the prompt in the input decides which one the caller reads. The ONNX export
@@ -15,7 +18,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModel
 
-from decide.textfmt import TAB_DIM
+from decide.textfmt import APPROVE_DIM, TAB_DIM
 
 
 class DecideNet(nn.Module):
@@ -29,7 +32,15 @@ class DecideNet(nn.Module):
         h = self.encoder.config.hidden_size
         self.drop = nn.Dropout(dropout)
         self.route_head = nn.Linear(h, 5)
-        self.grounded_head = nn.Linear(h, 1)
+        self.grounded_head = nn.Sequential(
+            nn.Linear(h + TAB_DIM, 256), nn.GELU(), nn.Dropout(dropout), nn.Linear(256, 1))
+        # Learned weight on the "draft states a number the article does not"
+        # flag, added straight to the grounded logit. Starts strongly negative
+        # (the flag never fires on a supported draft in train or dev) so the
+        # MLP does not have to rediscover it from 450 inputs; it stays trainable.
+        self.grounded_flag_w = nn.Parameter(torch.tensor(-8.0))
+        # same idea for the scope-broadening flag ("all plans" vs "all paid plans")
+        self.grounded_scope_w = nn.Parameter(torch.tensor(-8.0))
         self.approve_head = nn.Sequential(
             nn.Linear(h + TAB_DIM, 256), nn.GELU(), nn.Dropout(dropout), nn.Linear(256, 1))
 
@@ -44,6 +55,9 @@ class DecideNet(nn.Module):
     def forward(self, input_ids, attention_mask, tab, token_type_ids=None):
         h = self.drop(self.pooled(input_ids, attention_mask, token_type_ids))
         route = self.route_head(h)
-        approve = self.approve_head(torch.cat([h, tab.to(h.dtype)], dim=-1)).squeeze(-1)
-        grounded = self.grounded_head(h).squeeze(-1)
+        tab = tab.to(h.dtype)
+        approve = self.approve_head(torch.cat([h, tab], dim=-1)).squeeze(-1)
+        grounded = (self.grounded_head(torch.cat([h, tab], dim=-1)).squeeze(-1)
+                    + self.grounded_flag_w.to(h.dtype) * tab[:, APPROVE_DIM]
+                    + self.grounded_scope_w.to(h.dtype) * tab[:, APPROVE_DIM + 3])
         return route, approve, grounded

@@ -16,6 +16,8 @@ head, not a new model.
 
 from typing import Any, Dict, Optional, Tuple
 
+import re
+
 import numpy as np
 
 from decide.normalize import normalize
@@ -24,7 +26,37 @@ DECISIONS = ("route", "approve", "grounded")
 TIERS = ["free", "pro", "enterprise"]
 AMOUNT_EDGES = [0.0, 0.01, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 110, 120, 150,
                 200, 300, 350, 375, 400, 500, 1e12]
-TAB_DIM = 3 + 3 * (len(AMOUNT_EDGES) - 1) + 1
+APPROVE_DIM = 3 + 3 * (len(AMOUNT_EDGES) - 1) + 1
+GROUNDED_DIM = 4
+TAB_DIM = APPROVE_DIM + GROUNDED_DIM
+# a number (or range "3-5") together with the word that follows it, e.g.
+# ("3-5", "business"), ("300", "requests"), ("5", "minutes")
+_FACT = re.compile(r"(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)\s*([a-z%$]*)", re.IGNORECASE)
+
+
+_WORD = re.compile(r"[a-z]+")
+
+
+def scope_broadened(draft: str, kb: str) -> bool:
+    """
+    True when the draft says "all N" but the article only says "all <q> N"
+    for the same noun - e.g. article "all paid plans", draft "all plans".
+    Dropping the qualifier widens who the policy covers. (Narrowing the other
+    way round is allowed by the labels, so only this direction is flagged.)
+    """
+    dw = _WORD.findall(draft.lower())
+    kw = _WORD.findall(kb.lower())
+    kt = " ".join(kw)
+    for i in range(len(dw) - 1):
+        if dw[i] == "all" and ("all " + dw[i + 1]) not in kt:
+            for j in range(len(kw) - 2):
+                if kw[j] == "all" and kw[j + 2] == dw[i + 1]:
+                    return True
+    return False
+
+
+def number_facts(text: str) -> set:
+    return {(re.sub(r"\s+", "", m.group(1)), m.group(2).lower()) for m in _FACT.finditer(text)}
 
 PROMPT_SETS = {
     # full natural-language questions
@@ -64,7 +96,18 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     v = np.zeros(TAB_DIM, dtype=np.float32)
     v[ti] = 1.0
     v[3 + ti * nb + b] = 1.0
-    v[-1] = np.log1p(amt) / 7.0
+    v[APPROVE_DIM - 1] = np.log1p(amt) / 7.0
+    # grounded: does the draft state a number+unit (or range) the article never
+    # states? After normalisation no supported draft in train or dev does.
+    dn = normalize(str(state.get("draft_reply") or ""))
+    kn = normalize(str(state.get("kb_article") or ""))
+    d = number_facts(dn)
+    k = number_facts(kn)
+    extra = d - k
+    v[APPROVE_DIM] = 1.0 if extra else 0.0
+    v[APPROVE_DIM + 1] = min(len(extra), 3) / 3.0
+    v[APPROVE_DIM + 2] = (len(d & k) / len(d)) if d else 1.0
+    v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
     return v
 
 

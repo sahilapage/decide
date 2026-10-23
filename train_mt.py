@@ -11,6 +11,7 @@ probabilities (knowledge distillation).
 """
 
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -31,6 +32,13 @@ QUEUES = ["billing", "technical", "account", "shipping", "general"]
 
 def load(p):
     return [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+
+
+def amp(device):
+    """bf16 autocast on GPU; plain fp32 on CPU (most CPUs have no fast bf16)."""
+    if str(device).startswith("cuda"):
+        return torch.autocast("cuda", dtype=torch.bfloat16)
+    return contextlib.nullcontext()
 
 
 def encode(tok, rows, max_len):
@@ -64,7 +72,7 @@ def predict(model, tok, feats, tabs, device, bs=128):
         for s in range(0, n, bs):
             idx = order[s:s + bs]
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with amp(device):
                 r, a, g = model(**b)
             if d == "route":
                 res["route"][idx] = r.float().cpu().numpy()
@@ -77,11 +85,15 @@ def predict(model, tok, feats, tabs, device, bs=128):
 
 def train_one(args, tr_rows, soft, device, eval_sets):
     """soft: dict with teacher probs aligned to tr_rows or None. eval_sets: name -> rows."""
+    # Heads always start from the same weights (fixed seed), so runs that differ
+    # only in --seed (data order, dropout) stay in one basin and can be
+    # weight-averaged into a soup.
+    torch.manual_seed(args.init_seed)
+    tok = AutoTokenizer.from_pretrained(args.model)
+    model = DecideNet(args.model, dropout=args.dropout).to(device)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    tok = AutoTokenizer.from_pretrained(args.model)
-    model = DecideNet(args.model, dropout=args.dropout).to(device)
     feats, tabs = encode(tok, tr_rows, args.max_len)
     y_r = torch.tensor([QUEUES.index(r["labels"]["route"]) for r in tr_rows])
     y_a = torch.tensor([float(r["labels"]["approve"]) for r in tr_rows])
@@ -105,6 +117,9 @@ def train_one(args, tr_rows, soft, device, eval_sets):
                              {"params": head_params, "lr": args.lr * args.head_lr_mult}],
                             weight_decay=0.01)
     sch = get_cosine_schedule_with_warmup(opt, int(0.06 * steps), steps)
+    ema = None
+    if args.ema > 0:
+        ema = {k: v.detach().clone().float() for k, v in model.state_dict().items()}
     step = 0
     t0 = time.time()
     for ep in range(args.epochs):
@@ -113,7 +128,7 @@ def train_one(args, tr_rows, soft, device, eval_sets):
         cnt = {d: 0 for d in DECISIONS}
         for d, idx in batches():
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with amp(device):
                 r, a, g = model(**b)
             if d == "route":
                 logp = F.log_softmax(r.float(), -1)
@@ -136,11 +151,23 @@ def train_one(args, tr_rows, soft, device, eval_sets):
             opt.step()
             sch.step()
             step += 1
+            if ema is not None:
+                # warm EMA: short memory early, args.ema later
+                dec = min(args.ema, (1 + step) / (10 + step))
+                with torch.no_grad():
+                    for k, v in model.state_dict().items():
+                        if v.dtype.is_floating_point:
+                            ema[k].mul_(dec).add_(v.float(), alpha=1 - dec)
+                        else:
+                            ema[k].copy_(v)
             tot[d] += loss.item()
             cnt[d] += 1
         msg = " ".join("%s %.4f" % (d, tot[d] / max(1, cnt[d])) for d in DECISIONS)
         print("  epoch %d  %s  (%.0fs)" % (ep, msg, time.time() - t0), flush=True)
 
+    if ema is not None:
+        sd = model.state_dict()
+        model.load_state_dict({k: ema[k].to(sd[k].dtype) for k in sd})
     preds = {}
     for name, rows in eval_sets.items():
         f, t = encode(tok, rows, args.max_len)
@@ -166,14 +193,20 @@ def main():
     ap.add_argument("--alpha", type=float, default=0.5)
     ap.add_argument("--tw", type=str, default="", help="task weights e.g. route=1,approve=1,grounded=1")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--init_seed", type=int, default=1234, help="seed for head initialisation")
+    ap.add_argument("--ema", type=float, default=0.0, help="EMA decay of weights, e.g. 0.998")
     ap.add_argument("--prompt", default="long", choices=["long", "short"])
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
+    ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
     os.makedirs(args.out, exist_ok=True)
     json.dump(vars(args), open(os.path.join(args.out, "args.json"), "w"), indent=2)
-    device = "cuda"
+    device = args.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("device:", device, flush=True)
 
     tr = load("data/train.jsonl")
     dv = load("data/dev.jsonl")
@@ -209,7 +242,8 @@ def main():
                  **{"val_" + k: v for k, v in preds["val"].items()},
                  **{"dev_" + k: v for k, v in preds["dev"].items()})
         del preds
-        torch.cuda.empty_cache()
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
