@@ -13,22 +13,23 @@ Date: 2026-10-24. Repo: https://github.com/sahilapage/decide (`main`).
 
 ## 2. Current state (all verified)
 
-* **Shipped model:** `artifacts/student/`, Ettin-17M multi-task, recipe `v6c2` seed 0, fp32 ONNX, 68 MB.
-  * This recipe augments the grounded batches.
-  * The previous model is tagged `v5-e17-s3`.
+* **Shipped model:** `artifacts/student/`, Ettin-17M multi-task, recipe `v6t2` seed 3, fp32 ONNX, 68 MB.
+  * This recipe augments the grounded batches, now including `kb_trim`.
+  * Earlier models are tagged `v5-e17-s3` and `v6c2-s0`.
 * **Score:**
-  * dev `selfcheck.py` over HTTP from a fresh clone = **84.66 / 100**
-  * cross-fitted (honest) estimate = **83.8**
-  * route acc 88.9%, approve acc 89.3% (cost 0.204 vs always-hold 0.360), grounded 100%
+  * dev `selfcheck.py` over HTTP from a fresh clone = **84.98 / 100**
+  * cross-fitted (honest) estimate = **84.1**
+  * route acc 89.1%, approve acc 89.0% (cost 0.204 vs always-hold 0.368), grounded 100%
+  * hand-written judge cases: 25/26
 * **Latency (p95):** 6.3 ms over HTTP on 2 physical cores (4 logical), about 2.5 ms on a Mac (M5).
-* **Robustness:** stress-test mean 83.0 (old model 78.3). See `docs/robustness.md`.
+* **Robustness:** mean over shifts never seen in training 83.8 (old model 82.5); worst variant 78.1 (was 65.2). See `docs/robustness.md`.
 * **Teammate branch:** `perf/cpu-latency` is merged.
 
 Quick check from a fresh clone:
 
 ```bash
 ./start.sh &                         # serves :8000
-python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~84.7
+python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~85.0
 ```
 
 The dataset (`data/*.jsonl`) is **not in git**. It is gitignored because it was handed to participants. Copy it from:
@@ -115,7 +116,7 @@ in hours, and how it holds up on a new dataset.
   * The shipped model gets 21/26.
   * Grounded rejects correct hand-typed drafts on **new topics** with p ≈ 0.
   * Training articles always have 3–4 sentences; a one-sentence article is unfamiliar to the model.
-* **In flight at handover**, both on the 4090, runs `runs/v6t2*` and `runs/v6L2*`:
+* **Done since:** v6t2 shipped (selfcheck 84.98). The TinyLettuce init (v6L2) was level on clean data and no better on shifts, so it was not shipped. The original plan for these runs:
   * `v6t2` adds the `kb_trim` augmentation family. The `kb_single` stress variant is the shipped model's weak spot (70.6).
   * `v6L2` is the same recipe, but initialised from `KRLabsOrg/tinylettuce-ettin-17m-en`: MIT, Aug 2025, the same Ettin-17M already fine-tuned for RAG hallucination detection. It should generalise better to new KB topics.
   * Evaluate both with `tools/eval_candidates.sh runs/<x>_e17 runs/<x>h_e17_s0 runs/<x>h_e17_s3`, which finalizes, stress-tests and runs the judge cases on the GPU box.
@@ -123,10 +124,9 @@ in hours, and how it holds up on a new dataset.
 
 ## 6. Suggested next steps (in priority order)
 
-1. **Pick between v6c2, v6t2 and v6L2** on three things:
-   * cross-fitted clean score, which matters most because the hidden test is the same distribution
-   * stress mean
-   * judge cases
+1. ~~Pick between v6c2, v6t2 and v6L2~~: **done, v6t2 s3 shipped.** Further ideas, none urgent:
+   * more seeds of v6t2
+   * the kNN-confidence idea for approve abstention
 2. **Rehearse the 3-minute demo:**
    * one case that works
    * a correct abstention, e.g. "Do you have an office in Berlin?", which abstains on route
