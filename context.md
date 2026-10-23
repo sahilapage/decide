@@ -172,6 +172,14 @@ ticket + typed question
   * So we ship a single seed.
 * **Plain Newton Platt fit:** diverged on grounded. Replaced with bounded L-BFGS.
 * **Stitched cross-fit** (two calibrations combined): too noisy. Each half is now scored on its own.
+* **Seed ensembles (2026-10-24, `tools/ensemble_eval.py`):** averaging the
+  logits of the four trained 17M seeds does not beat the shipped seed.
+  * Same dev halves for every variant, 20 halves each.
+  * Single seeds score 82.73 / 83.82 / 83.73 / 84.78 (mean 83.77).
+  * The 4-seed average scores 84.01 (+0.25 over the mean single seed). The best pair, s1+s3, scores 84.63.
+  * Ensembles improve calibration slightly (about +0.01) but lose quality and abstention.
+  * Seeds differ by only 1–3 grounded errors out of 1,500 plus about 1 point of approve accuracy, so the 2-point spread between seeds is mostly luck.
+  * So the shipped s3's cross-fitted 84.7 still carries some seed-selection luck. The expected score for a fresh seed is about 83.8.
 
 ## 8. Infrastructure notes and gotchas
 

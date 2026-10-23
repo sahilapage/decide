@@ -100,7 +100,7 @@ in hours, and how it holds up on a new dataset.
    * Bitext mapped to the 5 queues
 
    Measure how far the current model drops. This is the most important unknown.
-3. **Try a 3-seed fp32 logit ensemble of the 17M.** Four seeds (`runs/v5h_e17_s0`–`s3`) are already trained on the 4090. Measure cross-fitted score and p95; it must stay ≤ 25 ms.
+3. ~~Seed ensemble~~: **done, no gain** (see `context.md` §7). Averaging the four 17M seeds scores 84.0, against 84.8 for the shipped seed. Don't spend more time here.
 4. **Test kNN-agreement confidence for abstention** (teammate's idea). Abstention (0.667) is our weakest scoring part. Expect less than 1 point, because errors are mostly label noise.
 5. **Robustness changes once the shifted set exists:** learnable amount rules, WiSE-FT averaging, and the Ettin reranker init for grounded.
 6. **Before judging:**
