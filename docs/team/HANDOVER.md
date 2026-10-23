@@ -4,12 +4,12 @@ Date: 2026-10-24. Repo: https://github.com/sahilapage/decide (`main`).
 
 ## 1. Read these first, in order
 
-1. `context.md`: the full log.
+1. `docs/team/context.md`: the full log.
    * Sections 1–14 are Sahil's side: task, data findings, architecture, results, failed experiments, gotchas, file map, judge Q&A.
    * Section 15 is Arhan's side: independent verification, the second GPU box, research verdicts on test-time training and RL.
 2. `README.md` and `model_card.md`: the submission-facing docs.
 3. `docs/benchmarks.md`: latency numbers, and why int8 is not shipped.
-4. `research_notes/Decide frontier research survey/*.md`: the frontier research survey (section 4 below).
+4. `docs/research/notes/*.md`: the frontier research survey (section 4 below).
 
 ## 2. Current state (all verified)
 
@@ -34,15 +34,15 @@ python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~85.9
 
 The dataset (`data/*.jsonl`) is **not in git**. It is gitignored because it was handed to participants. Copy it from:
 * the starter folder: `~/Downloads/Final_Hackathon_PS_Decide/starter`, or
-* the GPU box: `~/sahil/decide/data`
+* the training GPU box (copy kept next to the checkout)
 
 ## 3. Machines
 
 | Box | Access | Where things are |
 |---|---|---|
-| RTX 4090 (Sahil) | `ssh sra@10.27.100.101` | `~/sahil/decide`: venv built with `--system-site-packages` on `~/miniconda3/envs/trackeverything` (torch 2.8, transformers 5.20). Training runs in `runs/`, exports in `exports/` (gitignored, only on this box). Final export: `exports/final_e17_s3`. |
-| RTX 3060 (Arhan) | `ssh sra@10.1.205.86` (password: ask Arhan, never commit) | `~/Arhan/decide`, `conda activate decide` |
-| Mac (Sahil) | local | `/Users/sahilapage/cognext`, the git checkout. A demo server may still be running on 127.0.0.1:8000. |
+| RTX 4090 (Sahil) | SSH (lab network; ask Sahil) | the repo checkout: venv built with `--system-site-packages` on an existing conda env (torch 2.8, transformers 5.20). Training runs in `runs/`, exports in `exports/` (gitignored, only on this box). Final export: `exports/final_e17_s3`. |
+| RTX 3060 (Arhan) | SSH (lab network; ask Arhan) | the repo checkout, conda env `decide` |
+| Mac (Sahil) | local | the main git checkout. A demo server may still be running on 127.0.0.1:8000. |
 
 **Gotchas:**
 * Never use `pkill -f <pattern>` over SSH (it kills your own session). Use `pgrep -f "[t]rain_mt.py"`.
@@ -67,7 +67,7 @@ list what's hype.
 | Selective prediction / abstention / cost-sensitive decisions (incl. the kNN-confidence idea) | `abstention_cost_decisions.md` | was running; **re-run if missing** |
 
 After all six exist, write the combined report to
-`reports/Decide frontier research survey.md`. Each idea should get its expected gain, cost
+`docs/research/frontier_survey.md`. Each idea should get its expected gain, cost
 in hours, and how it holds up on a new dataset.
 
 ### Key findings so far (from the 3 finished tracks)
@@ -95,8 +95,8 @@ in hours, and how it holds up on a new dataset.
   * The hidden test is the held-back ~20% of the **same** dataset.
   * "Data generation or collection" is out of scope, so no public datasets or LLM-written tickets in training.
   * "Pretraining a language model from scratch" is out of scope.
-* **Research report:** `reports/Decide frontier research survey.md`, with the notes in `research_notes/`.
-* **Seed ensemble:** no gain. The 4-seed average scores 84.0, against 84.8 for the old shipped seed (see `context.md` §7).
+* **Research report:** `docs/research/frontier_survey.md`, with the notes in `docs/research/notes/`.
+* **Seed ensemble:** no gain. The 4-seed average scores 84.0, against 84.8 for the old shipped seed (see `docs/team/context.md` §7).
 * **Stress test** (`tools/stress_test.py`): the same dev tickets, rewritten.
   * Route and approve are robust.
   * Grounded was brittle: typos 0.81, KB reorder 0.83, extra KB sentence 0.74.
@@ -134,7 +134,7 @@ in hours, and how it holds up on a new dataset.
 3. **Before judging:**
    * Ask the mentors whether the judge box has internet for `pip install`.
    * Give the judges the host:port.
-   * Consider removing the internal IPs from `context.md`.
+   * Internal IPs and paths were removed from these notes (keep it that way).
 
 ## 7. Approve second stage (latest)
 

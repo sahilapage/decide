@@ -1,6 +1,6 @@
 # context.md — everything done so far on "Decide"
 
-> New session? Start with `HANDOVER.md` (current state, machines, next steps).
+> New session? Start with `docs/team/HANDOVER.md` (current state, machines, next steps).
 >
 > **Update (2026-10-24, later):** the shipped model is now **v6t2 seed 3**. It scores 84.98 on selfcheck from a fresh clone (cross-fitted 84.1) and is robust to rewritten tickets (`docs/robustness.md`). Sections 1–15 below describe the earlier v5 model, and their headline numbers (85.22 / 84.7) are historical.
 
@@ -23,9 +23,9 @@ Repo: https://github.com/sahilapage/decide (branch `main`)
   judged on open-ended answer quality, retrieval and LLM behaviour, which is
   much harder to pin down in 12 hours.
 * Compute:
-  * **RTX 4090** over SSH (`sra@10.27.100.101`), working directory `~/sahil/decide`
+  * **RTX 4090** over SSH on the lab network (Sahil's training box)
   * also available: a 3060 and an H100 (not needed)
-  * the Mac at `/Users/sahilapage/cognext` is the local copy and the git repo
+  * Sahil's Mac holds the main git checkout
 
 ## 2. The task (PS2 "Decide")
 
@@ -186,7 +186,7 @@ ticket + typed question
 ## 8. Infrastructure notes and gotchas
 
 * **Remote env:** pip install of torch timed out, so the remote venv is built
-  with `--system-site-packages` on top of `~/miniconda3/envs/trackeverything`
+  with `--system-site-packages` on top of an existing conda env
   (torch 2.8 cu129, transformers 5.20).
 * **Weights:** Ettin and DeBERTa ship only `pytorch_model.bin`; fetched with `hf_hub_download`.
 * **Killing processes:**
@@ -324,9 +324,9 @@ stay the source of truth; this covers only what isn't there.
 
   The p95/p50 ratio is about 1.3, so the 17M is steady even on the noisy
   laptop, unlike the 32M.
-* **Second GPU box (Arhan's):** `sra@10.1.205.86`, an RTX 3060 12 GB shared lab
-  machine (password: ask Arhan; never commit it).
-  * Clone: `~/Arhan/decide`, data copied into `data/`.
+* **Second GPU box (Arhan's):** an RTX 3060 12 GB shared lab machine on the
+  lab network (access: ask Arhan).
+  * A clone of the repo with the data copied into `data/`.
   * Env: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate decide`
     (Python 3.11, torch 2.14.1+cu130, transformers 5.20.2, onnxruntime 1.31).
     Torch had to come from PyPI because `download.pytorch.org` reset the
@@ -339,8 +339,8 @@ stay the source of truth; this covers only what isn't there.
   was only a size comparison and is superseded by Sahil's v5 17M. It lives in
   `runs/e17*` and `exports/e17` on both machines (gitignored, not used).
 * **Deep research report** (outside the repo):
-  `~/Final_Hackathon_PS_Decide/reports/Decide hackathon solution research.md`,
-  with source notes in `research_notes/`. Verdicts:
+  Arhan's earlier research report, kept outside the repo; the team survey is
+  in `docs/research/`. Verdicts:
   * Test-time training / adaptation: skip. There is no distribution shift, it
     costs at least one backward pass per request, and entropy-minimising TTA
     hurts calibration.

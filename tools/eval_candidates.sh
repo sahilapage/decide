@@ -6,8 +6,8 @@
 # Results land in docs/stress/<name>.json; compare with tools/compare_stress.py docs/stress/*.json
 # STRESS_LOCAL=1 runs the stress test on this machine instead.
 set -euo pipefail
-HOST=${HOST:-sra@10.27.100.101}
-REMOTE=${REMOTE:-sahil/decide}   # relative to the remote home
+: "${HOST:?set HOST=user@gpu-box}"
+REMOTE=${REMOTE:-decide}        # repo path relative to the remote home
 CACHE=${CACHE:-${TMPDIR:-/tmp}/decide_candidates}
 CPUS=${CPUS:-8-11}               # remote cores for the stress test
 FOLDS=$1; shift
