@@ -26,9 +26,18 @@ with no network calls.
 ```
 
 Then `python selfcheck.py --url http://localhost:8000/v1/decide`. Needs Python
-3.10+ on a CPU-only Linux box; no GPU, no network after `pip install`. The
+3.10+ on a CPU-only Linux box; no GPU, and no network once it is serving. The
 model weights are in the repo (`artifacts/student/`, 68 MB, stored in <100 MB
 chunks that are joined in memory at startup).
+
+* Serving installs only the five packages the request path imports (fastapi,
+  uvicorn[standard], numpy, onnxruntime, tokenizers).
+* If PyPI is unreachable, `start.sh` falls back to prebuilt Linux x86_64
+  wheels for CPython 3.10–3.12 from this repo's `wheels-v1` release
+  (`OFFLINE=1 ./start.sh` forces it).
+* A restart with the packages already installed is up in about 2 s.
+* Verified from fresh clones: online install on Python 3.10 and offline install
+  on Python 3.11 both score 84.98 with `selfcheck.py`.
 
 ### Live demo page (optional, not part of the graded API)
 
