@@ -57,9 +57,33 @@ that p95 across runs, and the median p50.
   the trustworthy number here. Confirm the final config on a quieter desktop
   CPU before changing what ships.
 
-### Still to do
+### int8 accuracy check (done) — we ship fp32
 
-* int8 accuracy and calibration check with `selfcheck.py` (quantisation can
-  shift probabilities).
-* Same sweep for the Ettin-17M student (trained on the GPU box: fp32 67.7 MB,
-  int8 17.2 MB; offline dev score 83.83 with the current policy code).
+Full dev, every call through the CPU runtime, policy refitted on each
+variant's own logits and cross-fitted (`tools/quant_eval.py`, Ettin-32M short
+prompts, i9-13900K, 2 physical cores):
+
+| Variant | p95 | cross-fitted dev total |
+|---|---|---|
+| fp32 | 14.2 ms | **83.4** |
+| int8 dynamic (default) | 7.9 ms | 80.4 |
+| int8 MatMul-only, per-channel | 7.9 ms | 80.1 |
+| int8 MatMul-only, per-tensor | 7.8 ms | 80.0 |
+| int8 per-channel, reduce_range | 8.0 ms | 79.9 |
+
+int8 costs ~3 points, almost all on **grounded** (accuracy 99.1% → 92.0%):
+spotting "15 minutes" vs "30 minutes" needs precise activations. Latency is
+only worth the trade if fp32 p95 is above ~40 ms, so the answer is a smaller
+fp32 model instead.
+
+### Ettin-17M student (shipped, fp32 68 MB)
+
+| Machine / layout | Threads | p95 (mean of decisions) |
+|---|---|---|
+| i9-13900K, 2 physical cores (`taskset -c 0-3`), in-process | 4 | 5.4 ms |
+| i9-13900K, 2 physical cores, in-process | 2 | 5.0 ms |
+| Apple M5, HTTP via `selfcheck.py` (full dev, 4,500 calls) | 4 | 2.5 ms |
+
+Ettin-32M fp32 on the same i9 layout is 13.4 ms; the 17M matches its quality
+(cross-fitted out-of-fold 84.1 vs 83.8), so the 17M ships with ~5x headroom
+under the 25 ms full-marks line.
