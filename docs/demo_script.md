@@ -44,7 +44,7 @@ correctly refuses to answer, and explain one trade-off.
 * **Robustness vs dev score.**
   * We rewrote dev tickets with typos, reordered articles, one-sentence articles and order IDs. The template-trained model fell to 65 on the worst variant; now its worst is 78.
   * The cost is about 0 on the cross-fitted dev score.
-  * We report the cross-fitted 84.1 next to the in-sample 85.0, because picking a seed on dev is optimistic.
+  * We report the cross-fitted 85.1 next to the in-sample 85.9, because picking a seed on dev is optimistic.
 * **Noise ceiling.**
   * Route errors are flat at 5.5% even on the model's most confident cases: those labels are random.
   * Route abstention sits 0.01 below its mathematical ceiling, so we stopped tuning it.
@@ -53,9 +53,9 @@ correctly refuses to answer, and explain one trade-off.
 
 | Question | Answer |
 |---|---|
-| "Is it really one model?" | Yes. One encoder and one ONNX graph with three outputs; the prompt names the question. |
+| "Is it really one model?" | Yes: one ONNX graph, one forward pass, three outputs. One shared encoder; route is a linear head, grounded an MLP, approve an MLP plus a 60-tree layer over that MLP's logit, compiled into the same graph (`tools/embed_stage.py`). A fourth decision is one prompt plus a small head (`docs/extensibility.md`: 90 s of training). |
 | "Is it extendable? Can you add a fourth decision?" | Yes, and we measured it (`docs/extensibility.md`). We trained on route + approve only, then added grounded later as if it were new: one prompt, one head, 89 s of training on the existing model. It scored 83.2 against 83.6 for joint training (noise ±1.1), and route/approve kept their accuracy. Head-only on a frozen encoder keeps the old answers bit-identical, but only reaches 83% on grounded, so a decision that needs a new skill gets the short fine-tune. |
 | "Why not 99% on route?" | About 5–6% of route labels are random (the brief says so). Our most confident 10% are still wrong 5.5% of the time, which is the floor. |
 | "Why not RL or test-time training?" | Every example is labelled, so RL reduces to cost-sensitive classification, and the 0.75 threshold is the exact optimum. Test-time adaptation makes wrong answers more confident. |
 | "Overfit to dev?" | Network weights never see dev. Dev only fits 3 calibration scales and the abstain thresholds. We report the cross-fitted number. |
-| "What if the data changes?" | `docs/robustness.md` covers 13 shifted variants plus 26 hand-written tickets (25/26 correct; the miss abstains). |
+| "What if the data changes?" | `docs/robustness.md`: 14 shifted variants of dev. `tests/complex_cases.json`: 31 hard hand-written tickets, 29 correct. Known gaps (paraphrased refusal reasons, '1 day' vs '24 hours') are listed in the model card. |
