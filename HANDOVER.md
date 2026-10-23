@@ -13,23 +13,22 @@ Date: 2026-10-24. Repo: https://github.com/sahilapage/decide (`main`).
 
 ## 2. Current state (all verified)
 
-* **Shipped model:** `artifacts/student/`, an Ettin-17M multi-task model, fp32 ONNX, 68 MB, seed 3.
+* **Shipped model:** `artifacts/student/`, Ettin-17M multi-task, recipe `v6c2` seed 0, fp32 ONNX, 68 MB.
+  * This recipe augments the grounded batches.
+  * The previous model is tagged `v5-e17-s3`.
 * **Score:**
-  * dev `selfcheck.py` = **85.22 / 100**
-  * cross-fitted (honest) estimate = **84.7**
-  * route acc 88.3%, approve cost 0.191 (always-hold 0.374), grounded 100%
-* **Latency (p95):** 2.5 ms over HTTP on a Mac (M5), 4.3 ms on 4 physical cores, 6.3 ms on 2 physical cores.
-* **Reproduced independently on two machines:**
-  * a fresh Linux clone via `./start.sh`
-  * Arhan's laptop
-  * both gave 85.22, all gates PASS
-* **Teammate branch:** `perf/cpu-latency` is merged. Nothing is pending on any branch.
+  * dev `selfcheck.py` over HTTP from a fresh clone = **84.66 / 100**
+  * cross-fitted (honest) estimate = **83.8**
+  * route acc 88.9%, approve acc 89.3% (cost 0.204 vs always-hold 0.360), grounded 100%
+* **Latency (p95):** 6.3 ms over HTTP on 2 physical cores (4 logical), about 2.5 ms on a Mac (M5).
+* **Robustness:** stress-test mean 83.0 (old model 78.3). See `docs/robustness.md`.
+* **Teammate branch:** `perf/cpu-latency` is merged.
 
 Quick check from a fresh clone:
 
 ```bash
 ./start.sh &                         # serves :8000
-python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~85.2
+python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~84.7
 ```
 
 The dataset (`data/*.jsonl`) is **not in git**. It is gitignored because it was handed to participants. Copy it from:
