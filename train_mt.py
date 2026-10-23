@@ -16,6 +16,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 
 import numpy as np
@@ -107,7 +108,7 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     # weight-averaged into a soup.
     torch.manual_seed(args.init_seed)
     tok = AutoTokenizer.from_pretrained(args.model)
-    model = DecideNet(args.model, dropout=args.dropout).to(device)
+    model = DecideNet(args.model, dropout=args.dropout, pool=args.pool).to(device)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -149,8 +150,19 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     steps = args.epochs * len(batches())
     head_params = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
     enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
-    opt = torch.optim.AdamW([{"params": enc_params, "lr": args.lr},
-                             {"params": head_params, "lr": args.lr * args.head_lr_mult}],
+    enc_groups = [{"params": enc_params, "lr": args.lr}]
+    if args.llrd < 1.0:
+        # layer-wise lr decay: top layer gets lr, each layer below x llrd, embeddings lowest
+        n_layers = model.encoder.config.num_hidden_layers
+        by_lr = {}
+        for n, p in model.named_parameters():
+            if not n.startswith("encoder."):
+                continue
+            m = re.search(r"\.layers?\.(\d+)\.", n)
+            depth = n_layers - 1 - int(m.group(1)) if m else (n_layers if "embed" in n else 0)
+            by_lr.setdefault(args.lr * args.llrd ** depth, []).append(p)
+        enc_groups = [{"params": ps, "lr": lr} for lr, ps in by_lr.items()]
+    opt = torch.optim.AdamW(enc_groups + [{"params": head_params, "lr": args.lr * args.head_lr_mult}],
                             weight_decay=0.01)
     sch = get_cosine_schedule_with_warmup(opt, int(0.06 * steps), steps)
     # L2-SP anchor: pull encoder weights back toward the pretrained start point
@@ -176,6 +188,9 @@ def train_one(args, tr_rows, soft, device, eval_sets):
         # grounded labels are clean (100% on dev), so the noise-robust loss skips it
         if args.gce > 0 and d != "grounded":
             return gce(logp, tgt, args.gce), logp
+        if args.focal > 0 and d != "grounded":
+            # focal loss (Lin et al. 2017), no alpha/pos_weight so probabilities stay unbiased
+            return -(tgt * (1 - logp.exp()) ** args.focal * logp).sum(-1).mean(), logp
         return -(tgt * logp).sum(-1).mean(), logp
 
     ema = None
@@ -264,7 +279,13 @@ def main():
                     help="L2-SP anchor weight toward the pretrained encoder, e.g. 1e-4")
     ap.add_argument("--gce", type=float, default=0.0,
                     help="generalised cross-entropy q for route/approve (noisy labels), e.g. 0.7; 0 = CE")
-    ap.add_argument("--augment_tasks",default="", help="decisions that see augmented rows, e.g. grounded (default all)")
+    ap.add_argument("--focal", type=float, default=0.0,
+                    help="focal loss gamma for route/approve, e.g. 2.0; 0 = CE")
+    ap.add_argument("--llrd", type=float, default=1.0,
+                    help="layer-wise lr decay per encoder layer below the top, e.g. 0.85; 1 = off")
+    ap.add_argument("--pool", default="mean", choices=["mean", "attn"],
+                    help="attn = learned per-decision attention pooling")
+    ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}

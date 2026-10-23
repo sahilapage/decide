@@ -22,7 +22,8 @@ from decide.textfmt import APPROVE_DIM, TAB_DIM
 
 
 class DecideNet(nn.Module):
-    def __init__(self, encoder_name_or_path: str, dropout: float = 0.1, from_config: bool = False):
+    def __init__(self, encoder_name_or_path: str, dropout: float = 0.1, from_config: bool = False,
+                 pool: str = "mean"):
         super().__init__()
         if from_config:
             cfg = AutoConfig.from_pretrained(encoder_name_or_path)
@@ -43,21 +44,36 @@ class DecideNet(nn.Module):
         self.grounded_scope_w = nn.Parameter(torch.tensor(-8.0))
         self.approve_head = nn.Sequential(
             nn.Linear(h + TAB_DIM, 256), nn.GELU(), nn.Dropout(dropout), nn.Linear(256, 1))
+        # pool="attn": one learned token scorer per decision (route, approve, grounded),
+        # so e.g. grounded can weight the one mismatched number instead of averaging
+        # it away. Zero init = uniform weights = exactly mean pooling at step 0.
+        self.pool = pool
+        if pool == "attn":
+            self.scorer = nn.Linear(h, 3)
+            nn.init.zeros_(self.scorer.weight)
+            nn.init.zeros_(self.scorer.bias)
 
     def pooled(self, input_ids, attention_mask, token_type_ids=None):
+        """Returns [B, 3, H]: one pooled vector per decision (identical for mean pooling)."""
         kw = dict(input_ids=input_ids, attention_mask=attention_mask)
         if token_type_ids is not None:
             kw["token_type_ids"] = token_type_ids
         out = self.encoder(**kw).last_hidden_state
         m = attention_mask.unsqueeze(-1).to(out.dtype)
-        return (out * m).sum(1) / m.sum(1).clamp(min=1.0)
+        if self.pool == "attn":
+            s = self.scorer(out).float().masked_fill(m == 0, -1e4)       # [B, S, 3]
+            w = torch.softmax(s, dim=1).to(out.dtype)
+            return torch.einsum("bsk,bsh->bkh", w, out)
+        mean = (out * m).sum(1) / m.sum(1).clamp(min=1.0)
+        return mean.unsqueeze(1).expand(-1, 3, -1)
 
     def forward(self, input_ids, attention_mask, tab, token_type_ids=None):
-        h = self.drop(self.pooled(input_ids, attention_mask, token_type_ids))
+        hs = self.drop(self.pooled(input_ids, attention_mask, token_type_ids))
+        h, h_a, h_g = hs[:, 0], hs[:, 1], hs[:, 2]
         route = self.route_head(h)
         tab = tab.to(h.dtype)
-        approve = self.approve_head(torch.cat([h, tab], dim=-1)).squeeze(-1)
-        grounded = (self.grounded_head(torch.cat([h, tab], dim=-1)).squeeze(-1)
+        approve = self.approve_head(torch.cat([h_a, tab], dim=-1)).squeeze(-1)
+        grounded = (self.grounded_head(torch.cat([h_g, tab], dim=-1)).squeeze(-1)
                     + self.grounded_flag_w.to(h.dtype) * tab[:, APPROVE_DIM]
                     + self.grounded_scope_w.to(h.dtype) * tab[:, APPROVE_DIM + 3])
         return route, approve, grounded

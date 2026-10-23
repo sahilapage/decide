@@ -32,7 +32,8 @@ def main():
             soup[k] = sum(sd[k].float() for sd in sds) / len(sds)
         else:
             soup[k] = sds[0][k]
-    net = DecideNet(os.path.join(runs[0], "encoder_config"), from_config=True)
+    net = DecideNet(os.path.join(runs[0], "encoder_config"), from_config=True,
+                    pool=args0.get("pool", "mean"))
     net.load_state_dict(soup)
     net = net.cuda()
     tok = AutoTokenizer.from_pretrained(os.path.join(runs[0], "tokenizer"))
