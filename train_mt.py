@@ -11,6 +11,7 @@ probabilities (knowledge distillation).
 """
 
 import argparse
+import contextlib
 import json
 import math
 import os
@@ -31,6 +32,13 @@ QUEUES = ["billing", "technical", "account", "shipping", "general"]
 
 def load(p):
     return [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+
+
+def amp(device):
+    """bf16 autocast on GPU; plain fp32 on CPU (most CPUs have no fast bf16)."""
+    if str(device).startswith("cuda"):
+        return torch.autocast("cuda", dtype=torch.bfloat16)
+    return contextlib.nullcontext()
 
 
 def encode(tok, rows, max_len):
@@ -64,7 +72,7 @@ def predict(model, tok, feats, tabs, device, bs=128):
         for s in range(0, n, bs):
             idx = order[s:s + bs]
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with amp(device):
                 r, a, g = model(**b)
             if d == "route":
                 res["route"][idx] = r.float().cpu().numpy()
@@ -113,7 +121,7 @@ def train_one(args, tr_rows, soft, device, eval_sets):
         cnt = {d: 0 for d in DECISIONS}
         for d, idx in batches():
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
-            with torch.autocast("cuda", dtype=torch.bfloat16):
+            with amp(device):
                 r, a, g = model(**b)
             if d == "route":
                 logp = F.log_softmax(r.float(), -1)
@@ -168,12 +176,16 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--prompt", default="long", choices=["long", "short"])
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
+    ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
     os.makedirs(args.out, exist_ok=True)
     json.dump(vars(args), open(os.path.join(args.out, "args.json"), "w"), indent=2)
-    device = "cuda"
+    device = args.device
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("device:", device, flush=True)
 
     tr = load("data/train.jsonl")
     dv = load("data/dev.jsonl")
@@ -209,7 +221,8 @@ def main():
                  **{"val_" + k: v for k, v in preds["val"].items()},
                  **{"dev_" + k: v for k, v in preds["dev"].items()})
         del preds
-        torch.cuda.empty_cache()
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
