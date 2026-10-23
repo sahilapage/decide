@@ -9,13 +9,14 @@ with no network calls.
 <!-- RESULTS:START -->
 | dev split, via `selfcheck.py` against the live service | |
 |---|---|
-| route | acc 0.889, macro-F1 (answered) 0.942, coverage 0.89 |
-| approve | acc 0.893, cost 0.204 vs always-hold 0.360 (3:1), coverage 0.85 |
+| route | acc 0.891, macro-F1 (answered) 0.946, coverage 0.85 |
+| approve | acc 0.890, cost 0.204 vs always-hold 0.368 (3:1), coverage 0.85 |
 | grounded | acc 1.000, macro-F1 1.000, coverage 1.00 |
-| mean ECE / Brier skill | 0.015 / 0.811 |
+| mean ECE / Brier skill | 0.012 / 0.811 |
 | p95 latency (mean of 3 decisions) | 6.3 ms over HTTP on 4 logical CPUs (2 physical cores, i9-13900K); ~2.5 ms on an Apple M5 |
-| **selfcheck total** | **84.7 / 100** (cross-fitted estimate 83.8, see model card) |
-| shifted-dev stress test (typos, reordered/extra KB sentences, ticket refs…) | mean 83.0 vs 78.3 for the un-augmented model, see `docs/robustness.md` |
+| **selfcheck total** | **85.0 / 100** (cross-fitted estimate 84.1, see model card) |
+| shifted-dev stress test (typos, reordered/extra KB sentences, ticket refs, one-sentence KBs…) | held-out-shift mean 83.8 vs 82.5 for the un-augmented model; worst case 78 vs 65, see `docs/robustness.md` |
+| hand-written judge-style cases (`tests/judge_cases.json`) | 25 / 26 as expected (the miss abstains) |
 <!-- RESULTS:END -->
 
 ## Start it (one command)
@@ -138,10 +139,10 @@ pip install -r requirements-train.txt                       # GPU box
 python train_baseline.py                                    # gate-1 sparse baseline
 M=jhu-clsp/ettin-encoder-17m
 C="--model $M --epochs 6 --lr 1e-4 --prompt short --augment 2 --augment_tasks grounded"
-python train_mt.py $C --out runs/v6c2_e17                       # 5-fold OOF
-python train_mt.py $C --out runs/v6c2h_e17_s0 --full --seed 0  # shipped network
-./finalize.sh runs/v6c2_e17 runs/v6c2h_e17_s0 exports/v6c2h_s0   # calibrate, export, benchmark
-python pack_student.py exports/v6c2h_s0 exports/v6c2h_s0/policy.json
+python train_mt.py $C --out runs/v6t2_e17                       # 5-fold OOF
+python train_mt.py $C --out runs/v6t2h_e17_s3 --full --seed 3  # shipped network
+./finalize.sh runs/v6t2_e17 runs/v6t2h_e17_s3 exports/v6t2h_s3   # calibrate, export, benchmark
+python pack_student.py exports/v6t2h_s3 exports/v6t2h_s3/policy.json
 python tools/stress_test.py                                     # shifted-dev robustness check
 ```
 
