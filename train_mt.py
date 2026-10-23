@@ -94,6 +94,8 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
+    n_orig = len(tr_rows)
+    aug_tasks = set(args.augment_tasks.split(",")) if args.augment_tasks else set(DECISIONS)
     if args.augment > 0:
         # augmented copies of the TRAINING rows only (fold validation stays clean)
         from decide.augment import augment
@@ -110,8 +112,8 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     def batches():
         out = []
         for d in DECISIONS:
-            w = args.task_weight.get(d, 1.0)
-            idx = np.random.permutation(len(tr_rows))
+            # augmented rows only feed the decisions listed in --augment_tasks
+            idx = np.random.permutation(len(tr_rows) if d in aug_tasks else n_orig)
             for s in range(0, len(idx), args.bs):
                 out.append((d, idx[s:s + args.bs]))
         random.shuffle(out)
@@ -207,6 +209,7 @@ def main():
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
+    ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}

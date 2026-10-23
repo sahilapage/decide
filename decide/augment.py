@@ -7,7 +7,8 @@ correct drafts "unsupported" with p ~ 0 when the KB article is reordered,
 gets one unrelated sentence, or has typos. Each augmented copy of a training
 ticket applies 1-3 of the families below; labels are unchanged.
 
-Families used in training: typo, case, kb_shuffle, kb_distractor.
+Families used in training: typo, case, kb_shuffle, kb_distractor, courtesy
+(no-claim opener/closer sentences around the draft).
 Deliberately NOT used, so the stress test can measure generalisation to unseen
 shifts: number words, punctuation removal, synonyms, body/draft reordering,
 amount formatting.
@@ -23,6 +24,7 @@ from decide.textfmt import fact_supported, number_facts
 _SENT = re.compile(r"(?<=[.!?])\s+")
 _LETTERS = "abcdefghijklmnopqrstuvwxyz"
 FIELDS = ("subject", "body", "draft_reply", "kb_article")
+FAMILIES = ["typo", "case", "kb_shuffle", "kb_distractor", "courtesy"]
 
 
 def _sents(t):
@@ -56,10 +58,32 @@ def case(text, rng):
     return " ".join(w.capitalize() if rng.random() < 0.3 else w for w in text.split(" "))
 
 
+# Courtesy / reference sentences that make no policy claim. Real replies wrap
+# the policy answer in these; a correct draft must stay "grounded". Wording is
+# deliberately different from tools/stress_test.py's draft_ticket_ref variant.
+_OPENERS = ["Thanks for getting in touch.", "Thank you for your patience.", "Happy to help with this.",
+            "I understand how frustrating this is.", "Apologies for the inconvenience.", "Good question.",
+            "Thanks for the details.", "I have checked this for you.", "I've reviewed ticket #{id}.",
+            "Hi there, thanks for writing in.", "Sorry for the trouble here."]
+_CLOSERS = ["Let me know if there is anything else.", "Have a great day.", "Reply here if you need more help.",
+            "Your reference is #{id}.", "Hope that helps!", "We appreciate your patience.",
+            "Feel free to reach out again.", "Kind regards, the support team."]
+
+
+def courtesy(draft, rng):
+    def fill(t):
+        return t.replace("{id}", str(rng.randint(1000, 999999)))
+    if rng.random() < 0.6:
+        draft = fill(rng.choice(_OPENERS)) + " " + draft
+    if rng.random() < 0.6:
+        draft = draft.rstrip() + " " + fill(rng.choice(_CLOSERS))
+    return draft
+
+
 def augment_row(row, rng, kb_pool):
     r = json.loads(json.dumps(row))
     s = r["state"]
-    fams = rng.sample(["typo", "case", "kb_shuffle", "kb_distractor"], rng.randint(1, 3))
+    fams = rng.sample(FAMILIES, rng.randint(1, 3))
     for f in fams:
         if f == "typo":
             rate = rng.uniform(0.02, 0.08)
@@ -68,6 +92,8 @@ def augment_row(row, rng, kb_pool):
         elif f == "case":
             for k in rng.sample(FIELDS, rng.randint(1, 4)):
                 s[k] = case(str(s.get(k) or ""), rng)
+        elif f == "courtesy":
+            s["draft_reply"] = courtesy(str(s.get("draft_reply") or ""), rng)
         elif f == "kb_shuffle":
             ss = _sents(s.get("kb_article"))
             rng.shuffle(ss)

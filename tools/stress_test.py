@@ -92,7 +92,8 @@ def num_words(t, rng):
     def w2d(m):
         return str(W2N[m.group(0).lower()])
     t = re.sub(r"\b\d{1,2}\b(?!\.)", d2w, t) if rng.random() < 0.5 else \
-        re.sub(r"\b(%s)\b" % "|".join(sorted(W2N, key=len, reverse=True)), w2d, t, flags=re.I)
+        re.sub(r"(?<![-\w])(%s)\b(?![-\s]+(?:hundred|thousand|and)\b|-)" % "|".join(sorted(W2N, key=len, reverse=True)),
+               w2d, t, flags=re.I)
     return t
 
 
