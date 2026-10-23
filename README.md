@@ -1,4 +1,4 @@
-# Decide — one shared decision model, three typed answers, ~3 ms on CPU
+# Decide — one shared decision model, three typed answers, ~6 ms on CPU
 
 `POST /v1/decide` answers three typed questions about a support ticket —
 **route** (5-way choice), **approve** (yes/no under a 3:1 cost) and
@@ -16,7 +16,7 @@ with no network calls.
 | p95 latency (mean of 3 decisions) | 6.3 ms over HTTP on 4 logical CPUs (2 physical cores, i9-13900K); ~2.5 ms on an Apple M5 |
 | **selfcheck total** | **85.9 / 100** (cross-fitted estimate 85.1, see model card) |
 | shifted-dev stress test (typos, reordered/extra KB sentences, ticket refs, one-sentence KBs…) | held-out-shift mean 83.8 vs 82.5 for the un-augmented model; worst case 78 vs 65, see `docs/robustness.md` |
-| hand-written judge-style cases (`tests/judge_cases.json`) | 25 / 26 as expected (the miss abstains) |
+| hand-written tests | `tests/complex_cases.json` 29 / 31 (multi-issue tickets, quoted threads, mixed language, multi-claim drafts); `tests/judge_cases.json` 25 / 33 incl. 7 known-gap cases from an independent audit |
 <!-- RESULTS:END -->
 
 ## Start it (one command)
@@ -36,8 +36,10 @@ chunks that are joined in memory at startup).
   wheels for CPython 3.10–3.12 from this repo's `wheels-v1` release
   (`OFFLINE=1 ./start.sh` forces it).
 * A restart with the packages already installed is up in about 2 s.
-* Verified from fresh clones: online install on Python 3.10 and offline install
-  on Python 3.11 both score 84.98 with `selfcheck.py`.
+* Verified from fresh clones: online install (Python 3.10) and offline install
+  (Python 3.11) both pass every gate; the current model scores 85.87.
+* No `python3-venv` on a stock Debian/Ubuntu box? `start.sh` falls back to
+  `virtualenv` (or run `apt install python3-venv`).
 
 ### Live demo page (optional, not part of the graded API)
 
@@ -47,9 +49,12 @@ chunks that are joined in memory at startup).
 
 `demo_ui.py` serves the same `/v1/decide` and `/health` from `app.py`
 unchanged and adds a single offline page (`demo/index.html`): preset demo
-cases, an editable ticket, the three typed answers with abstain badges, an
-amount slider that re-asks approve live, a 200-call latency test and the raw
-JSON responses. `python demo.py` runs the same cases in the terminal.
+cases, an editable ticket, the three typed answers with abstain badges, the
+gate-1 baseline's answer to the same ticket for comparison, an amount slider
+that re-asks approve live, a live mini-evaluation (random dev tickets, clean
+and rewritten, through both models, scored with the judges' metric code), a
+200-call latency test and the raw JSON responses. `python demo.py` runs the
+cases in the terminal.
 
 ## How it works
 
@@ -70,12 +75,13 @@ JSON responses. `python demo.py` runs the same cases in the terminal.
         ┌─────────────┼─────────────────────┐
    route head     approve head            grounded head
    Linear→5     MLP([h, aux])          MLP([h, aux]) + w·flags
+        │        → 60 boosted trees           │
+        │          (logit, amount÷cap, …)     │
+   noise-aware    Platt w/ ceiling,       Platt, p > 0.5
+   softmax        approve iff p > 0.75
         │             │                     │
-   temperature     Platt, approve iff     Platt, p > 0.5
-   scaling         p > 0.75 (3:1 cost)
-        │             │                     │
-   abstain if     abstain where it        abstain only if
-   low top-prob   most hurts 1-cost/hold  undecided
+   abstain if     abstain if p in         abstain only if
+   low top-prob   (0.17, 0.83)            undecided
 ```
 
 ### Where the sharing happens
@@ -83,10 +89,17 @@ JSON responses. `python demo.py` runs the same cases in the terminal.
 * `decide/textfmt.py` — every decision is a *(prompt, state)* pair fed to the
   same encoder. The prompt names the question, so one set of weights reads all
   three.
-* `decide/net.py` — `DecideNet`: one `encoder`, three heads of a few thousand
-  parameters each. More than 99.9% of the parameters are shared.
-* `artifacts/student/model.onnx` — one graph, three outputs. Every call runs
-  the shared encoder once; the API returns the head that was asked for.
+* `decide/net.py` — `DecideNet`: one `encoder` and three small heads (route
+  Linear 1.3k parameters; approve and grounded MLPs ~84k each). About 99% of
+  the parameters are shared.
+* `artifacts/student/model.onnx` — **one graph, three outputs**. Every call runs
+  the shared encoder once; the API returns the head that was asked for. The
+  approve head's second layer — 60 boosted trees (~2.7k numbers) over the
+  head's own logit plus amount ÷ tier cap, amount == 0 and phrase flags — is
+  compiled into the same graph as a standard `TreeEnsembleRegressor` node
+  (`tools/embed_stage.py`). It cannot run without the shared encoder's logit,
+  and it leaves route and grounded untouched. Without it the same network
+  scores 84.1 cross-fitted instead of 85.1.
 
 **A fourth decision is cheap, and we measured it** ([docs/extensibility.md](docs/extensibility.md)).
 We trained on route + approve only, then added grounded afterwards as if it
@@ -123,11 +136,14 @@ texts is a skill the encoder has to learn.
     output. The encoder handles the non-numeric slots.
 * **approve** depends on more than words: per-tier amount caps and a few
   disqualifying phrases, plus account history the ticket never mentions.
-  A small second stage (`decide/approve_stage.py`, 60 trees, numpy-only)
-  refines the shared network's approve logit with amount ÷ tier cap (caps
-  learned from the labels) and the phrase flags: +1.0 point cross-fitted. The
-  approve head sees the pooled text *and* a tabular vector (tier one-hot,
-  tier × amount bucket, log amount). With calibrated `p`, the 3:1 cost makes
+  The approve head sees the pooled text *and* a tabular vector (tier one-hot,
+  tier × amount bucket, log amount). Its second layer (60 boosted trees,
+  `decide/approve_stage.py`, compiled into the ONNX graph) refines that logit
+  with amount ÷ tier cap (caps estimated from train labels) and the
+  disqualifying-phrase flags. It is fitted on **out-of-fold** logits, so it
+  corrects the network's real over-confidence (the network memorises the
+  hidden-history refusals in train): +1.0 point cross-fitted. Putting the same
+  features into the network itself did not help (v7, `docs/report.md`). With calibrated `p`, the 3:1 cost makes
   approving right only when `3(1−p) < p`, i.e. **p > 0.75**.
 
 ### Calibration and abstention
@@ -142,14 +158,21 @@ texts is a skill the encoder has to learn.
   score from 0.832 to 0.858 (total +0.65).
 * The structural noise parameters (eps, bias, floor, ceiling) are fitted on
   the 6,500 out-of-fold predictions; only the scales (T, a, b) are refitted on
-  the shipped model's own dev predictions, and the dev numbers we report are
-  cross-fitted (fit on one half of dev, score the other).
+  the shipped model's own dev predictions. The headline selfcheck number is
+  therefore in-sample for those few parameters; next to it we report the
+  cross-fitted estimate (fit on one half of dev, score the other).
+* Dev also guided choices beyond the policy: the seed (best of two), the
+  recipe among the candidates in `docs/report.md`, and feature checks. So treat
+  ~84.5–85 as the expectation on unseen data.
 * Abstention is tuned per decision against an in-process copy of the judges'
   scorer (`decide/scoring.py`, built from `selfcheck.py`'s own functions):
-  for each decision we search abstain shares up to 18.5% and keep the
-  smallest share that reaches the best quality, so coverage stays above 80%.
-  For approve, the rule that wins is the marginal effect of a case on
-  `1 − cost/hold_cost`: `min(3(1−p), p) − 0.9·p`, which peaks near p = 0.75.
+  for each decision we search abstain shares up to 15% (coverage floor 0.85,
+  margin above the 80% target) and keep the smallest share that reaches the
+  best quality. Three approve rules are searched (by cost, by confidence, and
+  a cost-ratio rule); the shipped `policy.json` uses the confidence rule:
+  abstain when p is between 0.17 and 0.83, i.e. the least certain ~10% of
+  requests. Route abstains on the ~15% lowest top-probability tickets; grounded
+  essentially never.
 
 ## Reproduce
 
@@ -160,8 +183,10 @@ M=jhu-clsp/ettin-encoder-17m
 C="--model $M --epochs 6 --lr 1e-4 --prompt short --augment 2 --augment_tasks grounded"
 python train_mt.py $C --out runs/v6t2_e17                       # 5-fold OOF
 python train_mt.py $C --out runs/v6t2h_e17_s3 --full --seed 3  # shipped network
-./finalize.sh runs/v6t2_e17 runs/v6t2h_e17_s3 exports/v6t2h_s3   # calibrate, export, benchmark
-python pack_student.py exports/v6t2h_s3 exports/v6t2h_s3/policy.json
+python tools/fit_approve_stage.py runs/v6t2_e17 runs/v6t2h_e17_s3  # approve stage on OOF logits
+./finalize.sh runs/v6t2_e17_st runs/v6t2h_e17_s3_st exports/v6t2h_s3_st   # calibrate, export, benchmark
+python tools/embed_stage.py exports/v6t2h_s3_st --check data/dev.jsonl   # trees into the ONNX graph
+python pack_student.py exports/v6t2h_s3_st exports/v6t2h_s3_st/policy.json
 python tools/stress_test.py                                     # shifted-dev robustness check
 ```
 
@@ -173,11 +198,19 @@ python tools/stress_test.py                                     # shifted-dev ro
 | [jhu-clsp/ettin-encoder-32m](https://huggingface.co/jhu-clsp/ettin-encoder-32m) | compared, same quality, 2.7x slower | MIT |
 | [jhu-clsp/ettin-encoder-150m / -400m](https://huggingface.co/jhu-clsp) | teachers (training experiments only) | MIT |
 | [microsoft/deberta-v3-large](https://huggingface.co/microsoft/deberta-v3-large) | teacher (training only) | MIT |
-| [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya) encoder | teacher init (training only) | Apache-2.0 |
+| [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya) encoder | teacher init (training only) | Apache-2.0 (per its model card) |
+| [KRLabsOrg/tinylettuce-ettin-17m-en](https://huggingface.co/KRLabsOrg/tinylettuce-ettin-17m-en) | initialisation experiment (not shipped) | MIT |
 
-Libraries: ONNX Runtime (MIT), Hugging Face tokenizers (Apache-2.0),
-transformers (Apache-2.0), PyTorch (BSD-3), FastAPI (MIT), uvicorn (BSD-3),
-scikit-learn (BSD-3), SciPy (BSD-3), NumPy (BSD-3).
+Libraries: ONNX Runtime (MIT), ONNX (Apache-2.0), Hugging Face tokenizers
+(Apache-2.0), transformers (Apache-2.0), PyTorch (BSD-3), FastAPI (MIT),
+uvicorn (BSD-3), scikit-learn (BSD-3, training only), SciPy (BSD-3, training
+only), NumPy (BSD-3).
+
+**Training data:** only the provided train split. `decide/augment.py` adds
+label-preserving rewrites of provided train rows (typos, reordered or trimmed
+KB sentences, polite opener/closer sentences) for grounded batches only —
+augmentation, not data generation: no new labels, no external or LLM data,
+dev never augmented.
 
 Versions we ran: Python 3.11, onnxruntime 1.23/1.31, tokenizers 0.22,
 fastapi 0.161, torch 2.8 (training), transformers 5.20 (training).
@@ -192,6 +225,7 @@ fastapi 0.161, torch 2.8 (training), transformers 5.20 (training).
 | `decide/textfmt.py` | typed-question prompts and tabular features |
 | `decide/net.py` | shared encoder + three heads |
 | `decide/policy.py` | calibration, 0.75 approve rule, abstain tuning |
+| `decide/approve_stage.py`, `tools/embed_stage.py` | approve head's tree layer and its compilation into the ONNX graph |
 | `decide/scoring.py` | offline copy of the selfcheck maths |
 | `decide/student_runtime.py` | tokenizer + ONNX Runtime session |
 | `train_mt.py`, `eval_runs.py`, `export_onnx.py`, `pack_student.py` | training pipeline |

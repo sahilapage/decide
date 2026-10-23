@@ -26,7 +26,7 @@ from sklearn.model_selection import StratifiedKFold
 from transformers import AutoTokenizer, get_cosine_schedule_with_warmup
 
 from decide.net import DecideNet
-from decide.textfmt import DECISIONS, format_input, set_prompt_style, tabular
+from decide.textfmt import DECISIONS, format_input, set_prompt_style, set_tab_version, tabular
 
 QUEUES = ["billing", "technical", "account", "shipping", "general"]
 
@@ -296,6 +296,9 @@ def main():
     ap.add_argument("--prompt", default="long", choices=["long", "short"])
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
+    ap.add_argument("--tab_version", type=int, default=1,
+                    help="1 = original aux vector; 2 adds amount/cap ramps, amount==0 and phrase flags; "
+                         "3 = 2 + wider scope / weekday checks in the grounded scope flag")
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
     ap.add_argument("--cons", type=float, default=0.0,
@@ -321,6 +324,7 @@ def main():
                     help="fraction of batches kept for decisions not in --tasks (unfrozen encoder)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
+    set_tab_version(args.tab_version)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
     os.makedirs(args.out, exist_ok=True)
     json.dump(vars(args), open(os.path.join(args.out, "args.json"), "w"), indent=2)

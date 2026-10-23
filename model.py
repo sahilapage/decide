@@ -35,7 +35,7 @@ class DecisionModel:
             self.policy = Policy.load(os.path.join(student_dir, "policy.json"))
             # optional second stage of the approve head (decide/approve_stage.py)
             stage_path = os.path.join(student_dir, "approve_stage.json")
-            if os.path.exists(stage_path):
+            if os.path.exists(stage_path) and not self.net.stage_in_graph:
                 from decide.approve_stage import ApproveStage
                 self.approve_stage = ApproveStage.load(stage_path)
         else:
@@ -70,6 +70,9 @@ class DecisionModel:
     # -- approval -----------------------------------------------------------
     def approve(self, state: Dict[str, Any]) -> Tuple[bool, float, bool]:
         value, p, abstain = self.policy.approve(self._logit("approve", state))
+        if not str(state.get("subject") or "").strip() and not str(state.get("body") or "").strip():
+            # nothing to read about the request: never auto-approve blind
+            abstain = True
         return bool(value), p, bool(abstain)
 
     # -- grounding ----------------------------------------------------------

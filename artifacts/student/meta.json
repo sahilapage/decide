@@ -5,7 +5,14 @@
   "inputs": [
     "input_ids",
     "attention_mask",
-    "tab"
+    "tab",
+    "stage_x"
   ],
-  "prompt_style": "short"
+  "prompt_style": "short",
+  "stage_in_graph": true,
+  "stage_caps": {
+    "free": 21.32936108058339,
+    "pro": 80.28608514359847,
+    "enterprise": 414.13723544784375
+  }
 }

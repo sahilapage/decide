@@ -28,7 +28,41 @@ AMOUNT_EDGES = [0.0, 0.01, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 110, 120, 150
                 200, 300, 350, 375, 400, 500, 1e12]
 APPROVE_DIM = 3 + 3 * (len(AMOUNT_EDGES) - 1) + 1
 GROUNDED_DIM = 4
-TAB_DIM = APPROVE_DIM + GROUNDED_DIM
+TAB_DIM = APPROVE_DIM + GROUNDED_DIM          # layout v1 (71); v2 appends APPROVE_EXTRA_DIM
+
+# Layout v2 adds approve features so the shared network itself models the
+# amount fall-off around each tier's cap and the disqualifying phrases (this
+# replaced a separate boosted stage that sat outside the ONNX graph).
+# Caps: where approval of requests with no disqualifying phrase falls through
+# ~50% in train (0.9-1.0x cap 58%, 1.0-1.1x cap 30%; docs/ceiling.md).
+CAPS = {"free": 25.0, "pro": 110.0, "enterprise": 385.0}
+CAP_KNOTS = (0.5, 0.8, 0.9, 1.0, 1.1, 1.2, 1.5)
+# Mined from train labels: phrases that occur only in refused requests. The
+# alternatives broaden each one to paraphrases; on train+dev they match exactly
+# the same rows as the literal phrases (so training is unchanged), but a
+# hand-typed "chargeback" or "make an exception" now reads the same way.
+PHRASES = [
+    r"raised (something|this|it) (similar|before)|asked (about )?(this|it) before|(contacted|emailed|written to) you "
+    r"(about (this|it) )?before|not the first time|again for the same",
+    r"signed up recently|(just|only|recently) (signed up|joined|registered|created (my|an|the) account)|"
+    r"new (customer|account)|account is (brand )?new",
+    r"outside (your|the) (usual )?policy|(appreciate|make|grant|allow) an exception|bend the rules|one-off exception|"
+    r"as a one-off",
+    r"with my bank|dispute (a|the|this) charge|charge ?back|card (company|issuer)|reverse (it|the charge) (with|through) my bank",
+    r"question is",
+]
+_PHRASE_RE = [re.compile(p) for p in PHRASES]
+APPROVE_EXTRA_DIM = 3 * (1 + len(CAP_KNOTS)) + 1 + len(PHRASES)
+_TAB = {"version": 1}
+
+
+def set_tab_version(v: int) -> None:
+    """Training and serving must use the same layout; it is stored in args.json / meta.json."""
+    _TAB["version"] = int(v)
+
+
+def tab_dim() -> int:
+    return TAB_DIM + (APPROVE_EXTRA_DIM if _TAB["version"] >= 2 else 0)
 # a number (or range "3-5") together with the word that follows it, e.g.
 # ("3-5", "business"), ("300", "requests"), ("5", "minutes")
 _FACT = re.compile(r"(\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?)\s*([a-z%$]*)", re.IGNORECASE)
@@ -53,6 +87,41 @@ def scope_broadened(draft: str, kb: str) -> bool:
                 if kw[j] == "all" and kw[j + 2] == dw[i + 1]:
                     return True
     return False
+
+
+_NOT_QUALIFIER = {"the", "a", "an", "our", "your", "their", "its", "of", "for", "to", "and", "or", "is", "are", "be",
+                  "on", "in", "at", "by", "with", "every", "each", "any", "after", "before", "from", "per", "this",
+                  "that", "these", "those", "all", "than", "until", "within", "into", "over", "under", "about", "via",
+                  "no", "not"}
+_WEEKEND = {"weekend", "weekends", "saturday", "saturdays", "sunday", "sundays"}
+_WEEKDAY = {"weekday", "weekdays", "monday", "tuesday", "wednesday", "thursday", "friday", "mondays", "fridays"}
+
+
+def scope_broadened_v2(draft: str, kb: str) -> bool:
+    """Draft says "all N" where the article only ever qualifies N ("premium N",
+    "paid N") and never says "all N". Generalises scope_broadened: on train+dev it
+    fires on 0 of 4,822 supported drafts and on 173 unsupported ones (old: 8)."""
+    dw = _WORD.findall(draft.lower())
+    kw = _WORD.findall(kb.lower())
+    kt = " ".join(kw)
+    for i in range(len(dw) - 1):
+        if dw[i] == "all":
+            n = dw[i + 1]
+            if n in _NOT_QUALIFIER or ("all " + n) in kt:
+                continue
+            for j in range(1, len(kw)):
+                if kw[j] == n and kw[j - 1] not in _NOT_QUALIFIER:
+                    return True
+    return False
+
+
+def days_conflict(draft: str, kb: str) -> bool:
+    """Draft promises weekend days the article's opening days exclude, or the reverse."""
+    dw, kw = set(_WORD.findall(draft.lower())), set(_WORD.findall(kb.lower()))
+    k_days = kw & (_WEEKEND | _WEEKDAY)
+    if not k_days:
+        return False
+    return bool((dw & _WEEKEND) and not (kw & _WEEKEND)) or bool((dw & _WEEKDAY) and not (kw & _WEEKDAY))
 
 
 def number_facts(text: str) -> set:
@@ -93,6 +162,10 @@ def ticket_numbers(state: Dict[str, Any]) -> set:
 
 
 def fact_supported(fact, kb_facts) -> bool:
+    # Same number, same unit (one typo allowed). Matching the same duration across
+    # units ("1 day" vs "24 hours") was tried and rejected: the check is not
+    # claim-aware, so on train+dev it un-flagged 13 unsupported drafts whose
+    # changed number happened to equal another claim in another unit.
     num, unit = fact
     return any(n == num and _unit_match(unit, u) for n, u in kb_facts)
 
@@ -131,7 +204,7 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     nb = len(AMOUNT_EDGES) - 1
     b = int(np.searchsorted(AMOUNT_EDGES, amt, side="right") - 1)
     b = min(max(b, 0), nb - 1)
-    v = np.zeros(TAB_DIM, dtype=np.float32)
+    v = np.zeros(tab_dim(), dtype=np.float32)
     v[ti] = 1.0
     v[3 + ti * nb + b] = 1.0
     v[APPROVE_DIM - 1] = np.log1p(amt) / 7.0
@@ -148,7 +221,25 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     v[APPROVE_DIM] = 1.0 if extra else 0.0
     v[APPROVE_DIM + 1] = min(len(extra), 3) / 3.0
     v[APPROVE_DIM + 2] = (1 - len(extra) / len(d)) if d else 1.0
-    v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
+    if _TAB["version"] >= 3:
+        # one "draft claims a wider / different scope than the article" flag
+        v[APPROVE_DIM + 3] = 1.0 if (scope_broadened(dn, kn) or scope_broadened_v2(dn, kn)
+                                     or days_conflict(dn, kn)) else 0.0
+    else:
+        v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
+    if _TAB["version"] >= 2:
+        o = TAB_DIM
+        r = amt / CAPS[TIERS[ti]] if amt > 0 else 0.0
+        per = 1 + len(CAP_KNOTS)
+        b = o + ti * per
+        v[b] = min(r, 3.0) / 3.0
+        for j, k in enumerate(CAP_KNOTS):
+            v[b + 1 + j] = min(max(r - k, 0.0), 2.0)
+        o += 3 * per
+        v[o] = 1.0 if amt == 0 else 0.0
+        text = (str(state.get("subject") or "") + " " + str(state.get("body") or "")).lower()
+        for j, rx in enumerate(_PHRASE_RE):
+            v[o + 1 + j] = 1.0 if rx.search(text) else 0.0
     return v
 
 

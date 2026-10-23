@@ -16,7 +16,7 @@ import torch
 from transformers import AutoTokenizer
 
 from decide.net import DecideNet
-from decide.textfmt import set_prompt_style
+from decide.textfmt import set_prompt_style, set_tab_version
 from train_mt import encode, load, predict
 
 
@@ -25,6 +25,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     args0 = json.load(open(os.path.join(runs[0], "args.json")))
     set_prompt_style(args0.get("prompt", "long"))
+    set_tab_version(args0.get("tab_version", 1))
     sds = [torch.load(os.path.join(r, "model.pt"), map_location="cpu") for r in runs]
     soup = {}
     for k in sds[0]:

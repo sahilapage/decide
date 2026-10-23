@@ -15,7 +15,7 @@ import shutil
 import torch
 
 from decide.net import DecideNet
-from decide.textfmt import TAB_DIM
+from decide.textfmt import set_tab_version, tab_dim
 
 
 class Wrap(torch.nn.Module):
@@ -38,6 +38,7 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     run_args = json.load(open(os.path.join(args.run, "args.json")))
+    set_tab_version(run_args.get("tab_version", 1))
     net = DecideNet(os.path.join(args.run, "encoder_config"), from_config=True,
                     pool=run_args.get("pool", "mean"))
     sd = torch.load(os.path.join(args.run, "model.pt"), map_location="cpu")
@@ -50,7 +51,7 @@ def main():
 
     ids = torch.ones(1, 48, dtype=torch.long)
     mask = torch.ones(1, 48, dtype=torch.long)
-    tab = torch.zeros(1, TAB_DIM)
+    tab = torch.zeros(1, tab_dim())
     inputs = (ids, mask, tab) + ((torch.zeros(1, 48, dtype=torch.long),) if use_tt else ())
     names = ["input_ids", "attention_mask", "tab"] + (["token_type_ids"] if use_tt else [])
     dyn = {"input_ids": {0: "b", 1: "s"}, "attention_mask": {0: "b", 1: "s"}, "tab": {0: "b"},
@@ -74,7 +75,7 @@ def main():
             shutil.copy(os.path.join(tok_dir, f), os.path.join(args.out, f))
     meta = {"max_len": args.max_len or run_args["max_len"], "use_token_type_ids": use_tt,
             "encoder": run_args["model"], "inputs": names,
-            "prompt_style": run_args.get("prompt", "long")}
+            "prompt_style": run_args.get("prompt", "long"), "tab_version": run_args.get("tab_version", 1)}
     json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"), indent=2)
     if args.policy:
         shutil.copy(args.policy, os.path.join(args.out, "policy.json"))

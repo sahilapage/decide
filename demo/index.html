@@ -80,6 +80,12 @@
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
   .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .base { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--muted); }
+  .base b { color: var(--text); }
+  table.ev { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  table.ev th, table.ev td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; font-family: var(--mono); }
+  table.ev th:first-child, table.ev td:first-child, table.ev th:nth-child(2), table.ev td:nth-child(2) { text-align: left; font-family: inherit; }
+  table.ev tr.us td { font-weight: 700; }
 </style>
 </head>
 <body>
@@ -134,6 +140,19 @@
     </div>
 
     <section class="panel">
+      <h2>Live mini-evaluation: Decide vs the gate-1 baseline</h2>
+      <div class="actions" style="margin-top:0">
+        <button id="evalBtn">Run 150 random dev tickets through both models</button>
+        <span class="note" id="evalNote">Each ticket is asked all three decisions, once as written and once rewritten (typos, reordered / trimmed article, polite opener…). Scored with the judges' metric code.</span>
+      </div>
+      <table class="ev" id="evalTable" hidden>
+        <thead><tr><th>model</th><th>tickets</th><th>total /100*</th><th>route acc</th><th>approve acc</th><th>grounded acc</th><th>p95 ms</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="note">* latency scored at full marks for both; the totals compare decision quality, calibration and abstention. The baseline is the sparse n-gram model we submitted at gate 1.</div>
+    </section>
+
+    <section class="panel">
       <h2>Latency, measured live</h2>
       <div class="actions" style="margin-top:0">
         <button id="bench">Run 200 sequential calls</button>
@@ -183,6 +202,14 @@ const PRESETS = [
   { name: "4 · Approve near the Free-tier cap (use the slider)", ask: ["approve"], state: {
     subject: "Refund request", body: "Please refund my last charge, I did not use it.",
     customer_tier: "free", amount: 22.0, draft_reply: "", kb_article: "" } },
+  { name: "5 · Hand-typed, off-template: short article, order number in the draft", ask: ["grounded"], state: {
+    subject: "refund status", body: "Where is my refund for order 48213?", customer_tier: "pro", amount: 45.5,
+    draft_reply: "Thanks for getting in touch. I've checked order #48213: refunds are issued within 5 business days.",
+    kb_article: "Refunds are issued within five business days of approval." } },
+  { name: "5b · Same, but the draft promises 10 business days", ask: ["grounded"], state: {
+    subject: "refund status", body: "Where is my refund for order 48213?", customer_tier: "pro", amount: 45.5,
+    draft_reply: "Thanks for getting in touch. I've checked order #48213: refunds are issued within 10 business days.",
+    kb_article: "Refunds are issued within five business days of approval." } },
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -247,6 +274,25 @@ const RENDER = {
   grounded: (res) => renderBinary("card-grounded", res, "supported", "not supported", 0.5, "0.5"),
 };
 
+let baselineOk = true;
+async function baseline(decision, state) {
+  if (!baselineOk) return;
+  try {
+    const r = await fetch("/demo/baseline", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, state }) });
+    if (!r.ok) { baselineOk = false; return; }
+    const b = await r.json();
+    let txt;
+    if (decision === "route") txt = `<b>${esc(b.value)}</b> (conf ${b.confidence.toFixed(2)})`;
+    else if (decision === "approve") txt = `<b>${b.value ? "auto-approve" : "hold for review"}</b> (p ${b.p_true.toFixed(3)})`;
+    else txt = `<b>${b.value ? "supported" : "not supported"}</b> (p ${b.p_true.toFixed(3)})`;
+    const el = document.createElement("div");
+    el.className = "base";
+    el.innerHTML = `gate-1 baseline says: ${txt}${b.abstain ? " · abstains" : ""}`;
+    $("card-" + decision).querySelector(".body").appendChild(el);
+  } catch (e) { baselineOk = false; }
+}
+
 async function run(decisions) {
   const state = readState();
   for (const d of decisions) {
@@ -254,6 +300,7 @@ async function run(decisions) {
       const res = await ask(d, state);
       raw[d] = res.j;
       RENDER[d](res);
+      await baseline(d, state);
     } catch (e) {
       $("card-" + d).querySelector(".body").innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
     }
@@ -317,6 +364,34 @@ $("amtSlider").addEventListener("input", (e) => {
 $("askAll").addEventListener("click", () => run(["route", "approve", "grounded"]));
 document.querySelectorAll("[data-ask]").forEach((b) => b.addEventListener("click", () => run([b.dataset.ask])));
 $("bench").addEventListener("click", bench);
+
+async function miniEval() {
+  const btn = $("evalBtn");
+  btn.disabled = true;
+  $("evalNote").textContent = "running… (both models, 150 tickets × 3 decisions × clean + rewritten)";
+  try {
+    const r = await fetch("/demo/minieval?n=150&seed=" + Math.floor(Math.random() * 1000));
+    if (!r.ok) throw new Error("HTTP " + r.status + " " + (await r.text()));
+    const j = await r.json();
+    const rows = [];
+    for (const set of ["clean", "rewritten"]) {
+      for (const m of ["decide", "baseline"]) {
+        const x = j.models[m] && j.models[m][set];
+        if (!x) continue;
+        rows.push(`<tr class="${m === "decide" ? "us" : ""}"><td>${m === "decide" ? "Decide" : "baseline"}</td><td>${set}</td>
+          <td>${x.total.toFixed(1)}</td><td>${x.route_acc.toFixed(3)}</td><td>${x.approve_acc.toFixed(3)}</td>
+          <td>${x.grounded_acc.toFixed(3)}</td><td>${x.p95_ms.toFixed(1)}</td></tr>`);
+      }
+    }
+    $("evalTable").querySelector("tbody").innerHTML = rows.join("");
+    $("evalTable").hidden = false;
+    $("evalNote").textContent = `Done: ${j.n} random dev tickets, measured just now on this machine.`;
+  } catch (e) {
+    $("evalNote").textContent = "Error: " + e.message;
+  }
+  btn.disabled = false;
+}
+$("evalBtn").addEventListener("click", miniEval);
 
 fetch("/health").then((r) => r.json()).then((h) => {
   $("health").textContent = h.loaded ? "service up · model loaded" : "service up · model not loaded";

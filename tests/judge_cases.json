@@ -362,5 +362,103 @@
    "draft_reply": "",
    "kb_article": ""
   }
+ },
+ {
+  "id": "a7",
+  "decision": "approve",
+  "expect": false,
+  "why": "paraphrased chargeback threat",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund this charge or I will file a chargeback with my credit card company.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a8",
+  "decision": "approve",
+  "expect": false,
+  "why": "paraphrased new account",
+  "state": {
+   "subject": "refund request",
+   "body": "I just created my account yesterday, please refund the first charge.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a9",
+  "decision": "approve",
+  "expect": false,
+  "why": "paraphrased exception request",
+  "state": {
+   "subject": "refund request",
+   "body": "I know it is late but could you make an exception and refund it?",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a10",
+  "decision": "approve",
+  "expect": false,
+  "why": "paraphrased repeat request",
+  "state": {
+   "subject": "refund request",
+   "body": "I have asked about this before, please refund the charge again.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a11",
+  "decision": "approve",
+  "expect": false,
+  "why": "literal phrase in a new sentence",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund it, otherwise I will dispute a charge with my bank.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "g13",
+  "decision": "grounded",
+  "expect": false,
+  "why": "days changed (no number)",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Our office is open on weekends.",
+   "kb_article": "Our office is open Monday to Friday, 9am to 5pm."
+  }
+ },
+ {
+  "id": "g14",
+  "decision": "grounded",
+  "expect": false,
+  "why": "audience broadened (no 'all X' in KB)",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "All members get free shipping on every order.",
+   "kb_article": "Premium members get free shipping on every order."
+  }
  }
 ]

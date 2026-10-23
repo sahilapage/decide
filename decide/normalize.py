@@ -74,6 +74,9 @@ _TO_BASE = {"minute": ("minutes", 1), "hour": ("minutes", 60),
             "month": ("days", 30), "year": ("days", 365)}
 _THOUSAND = re.compile(r"\b(\d+)\s+thousand\b", re.IGNORECASE)
 _SPACES = re.compile(r"\s+")
+# "3 to 5 business days", "between 3 and 5 days" -> "3-5 business days"
+_RANGE = re.compile(r"\b(?:between\s+)?(\d+)\s+(?:to|and)\s+(\d+)(?=\s+(?:business|working|minutes?|hours?|days?|weeks?|months?|years?)\b)",
+                    re.IGNORECASE)
 
 
 def _duration_sub(m: re.Match) -> str:
@@ -165,6 +168,7 @@ def normalize(text: str) -> str:
     t = _A_UNIT.sub(lambda m: "1 " + m.group(1).lower(), t)
     t = re.sub(r"\ba thousand\b", "1000", t, flags=re.IGNORECASE)
     t = _THOUSAND.sub(lambda m: str(int(m.group(1)) * 1000), t)
+    t = _RANGE.sub(lambda m: "%s-%s" % (m.group(1), m.group(2)), t)
     t = _DURATION.sub(_duration_sub, t)
     return _SPACES.sub(" ", t).strip()
 

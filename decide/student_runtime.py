@@ -13,18 +13,25 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from decide.textfmt import format_input, set_prompt_style, tabular
+MAX_FIELD_CHARS = 4000
+
+from decide.approve_stage import features as stage_features
+from decide.textfmt import format_input, set_prompt_style, set_tab_version, tabular
 
 
 class StudentRuntime:
-    def __init__(self, folder: str):
+    def __init__(self, folder: str, onnx_file: str = ""):
         meta = json.load(open(os.path.join(folder, "meta.json")))
+        # the approve second stage compiled into the graph (tools/embed_stage.py)
+        self.stage_in_graph = bool(meta.get("stage_in_graph")) and not onnx_file.endswith(".nostage")
+        self.stage_caps = meta.get("stage_caps")
         self.use_tt = meta["use_token_type_ids"]
         set_prompt_style(meta.get("prompt_style", "long"))
+        set_tab_version(meta.get("tab_version", 1))
         self.tok = Tokenizer.from_file(os.path.join(folder, "tokenizer.json"))
         self.tok.no_padding()
         self.tok.enable_truncation(max_length=int(meta["max_len"]), strategy="longest_first")
-        variant = os.environ.get("DECIDE_ONNX", meta.get("variant", "model.onnx"))
+        variant = onnx_file or os.environ.get("DECIDE_ONNX", meta.get("variant", "model.onnx"))
         so = ort.SessionOptions()
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         so.intra_op_num_threads = int(os.environ.get("DECIDE_THREADS", meta.get("threads", 4)))
@@ -53,9 +60,15 @@ class StudentRuntime:
                 "tab": tabular(state)[None, :]}
         if self.use_tt:
             feed["token_type_ids"] = np.asarray([enc.type_ids], dtype=np.int64)
+        if self.stage_in_graph:
+            feed["stage_x"] = np.asarray([stage_features(0.0, state, self.stage_caps)[1:]], dtype=np.float32)
         return feed
 
     def logits(self, decision: str, state: Dict[str, Any]):
+        # Clip very long fields before tokenising: pair truncation is quadratic in
+        # length, so a pasted full article could otherwise cost >100 ms. 4,000
+        # characters is ~8x the longest field in train/dev (482).
+        state = {k: (v[:MAX_FIELD_CHARS] if isinstance(v, str) else v) for k, v in (state or {}).items()}
         r, a, g = self.sess.run(self.out_names, self.encode(decision, state))
         if decision == "route":
             return r[0].astype(np.float64)
