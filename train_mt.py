@@ -83,6 +83,23 @@ def predict(model, tok, feats, tabs, device, bs=128):
     return res
 
 
+def two_class(z):
+    """Binary logit -> 2-class log-probs, so binaries share the route KL code."""
+    return F.log_softmax(torch.stack([torch.zeros_like(z), z], -1), -1)
+
+
+def sym_kl(logp, logq):
+    """Symmetric KL between two batches of log-prob rows (consistency / R-Drop)."""
+    p, q = logp.exp(), logq.exp()
+    return 0.5 * ((p * (logp - logq)).sum(-1) + (q * (logq - logp)).sum(-1)).mean()
+
+
+def gce(logp, tgt, q):
+    """Generalised cross-entropy (Zhang & Sabuncu 2018): (1 - p^q)/q, robust to flipped labels.
+    q -> 0 recovers cross-entropy, q = 1 is MAE. Soft targets weight each class."""
+    return (tgt * (1 - logp.exp().clamp_min(1e-6) ** q) / q).sum(-1).mean()
+
+
 def train_one(args, tr_rows, soft, device, eval_sets):
     """soft: dict with teacher probs aligned to tr_rows or None. eval_sets: name -> rows."""
     # Heads always start from the same weights (fixed seed), so runs that differ
@@ -108,12 +125,22 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     y_a = torch.tensor([float(r["labels"]["approve"]) for r in tr_rows])
     y_g = torch.tensor([float(r["labels"]["grounded"]) for r in tr_rows])
 
+    # --cons pairs every original row with one of its augmented copies (or, without
+    # augmentation, with itself under a second dropout mask = R-Drop), so batches
+    # are drawn from the originals only and the copy is looked up per step
+    paired = args.cons > 0
+
+    def partner(d, idx):
+        if args.augment > 0 and d in aug_tasks:
+            return idx + n_orig * np.random.randint(1, args.augment + 1, size=len(idx))
+        return idx
+
     # homogeneous batches per decision, interleaved
     def batches():
         out = []
         for d in DECISIONS:
             # augmented rows only feed the decisions listed in --augment_tasks
-            idx = np.random.permutation(len(tr_rows) if d in aug_tasks else n_orig)
+            idx = np.random.permutation(len(tr_rows) if d in aug_tasks and not paired else n_orig)
             for s in range(0, len(idx), args.bs):
                 out.append((d, idx[s:s + args.bs]))
         random.shuffle(out)
@@ -126,6 +153,31 @@ def train_one(args, tr_rows, soft, device, eval_sets):
                              {"params": head_params, "lr": args.lr * args.head_lr_mult}],
                             weight_decay=0.01)
     sch = get_cosine_schedule_with_warmup(opt, int(0.06 * steps), steps)
+    # L2-SP anchor: pull encoder weights back toward the pretrained start point
+    anchor = [p.detach().clone() for p in enc_params] if args.l2sp > 0 else None
+
+    def task_loss(d, out, idx):
+        """Returns (loss, log-probs) for decision d on rows idx."""
+        r, a, g = out
+        if d == "route":
+            logp = F.log_softmax(r.float(), -1)
+            hard = F.one_hot(y_r[idx], 5).float().to(device)
+            if soft is not None:
+                tgt = (1 - args.alpha) * hard + args.alpha * torch.from_numpy(soft["route"][idx]).to(device)
+            else:
+                tgt = hard * (1 - args.ls) + args.ls / 5
+        else:
+            z = (a if d == "approve" else g).float()
+            yy = (y_a if d == "approve" else y_g)[idx].to(device)
+            if soft is not None:
+                yy = (1 - args.alpha) * yy + args.alpha * torch.from_numpy(soft[d][idx]).to(device)
+            logp = two_class(z)
+            tgt = torch.stack([1 - yy, yy], -1)
+        # grounded labels are clean (100% on dev), so the noise-robust loss skips it
+        if args.gce > 0 and d != "grounded":
+            return gce(logp, tgt, args.gce), logp
+        return -(tgt * logp).sum(-1).mean(), logp
+
     ema = None
     if args.ema > 0:
         ema = {k: v.detach().clone().float() for k, v in model.state_dict().items()}
@@ -138,22 +190,18 @@ def train_one(args, tr_rows, soft, device, eval_sets):
         for d, idx in batches():
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
             with amp(device):
-                r, a, g = model(**b)
-            if d == "route":
-                logp = F.log_softmax(r.float(), -1)
-                hard = F.one_hot(y_r[idx], 5).float().to(device)
-                if soft is not None:
-                    tgt = (1 - args.alpha) * hard + args.alpha * torch.from_numpy(soft["route"][idx]).to(device)
-                else:
-                    tgt = hard * (1 - args.ls) + args.ls / 5
-                loss = -(tgt * logp).sum(-1).mean()
-            else:
-                z = (a if d == "approve" else g).float()
-                yy = (y_a if d == "approve" else y_g)[idx].to(device)
-                if soft is not None:
-                    yy = (1 - args.alpha) * yy + args.alpha * torch.from_numpy(soft[d][idx]).to(device)
-                loss = F.binary_cross_entropy_with_logits(z, yy)
+                out = model(**b)
+            loss, logp = task_loss(d, out, idx)
+            if paired:
+                idx2 = partner(d, idx)
+                b2 = collate(tok, [feats[d][i] for i in idx2], tabs[idx2], device)
+                with amp(device):
+                    out2 = model(**b2)
+                loss2, logp2 = task_loss(d, out2, idx2)
+                loss = 0.5 * (loss + loss2) + args.cons * sym_kl(logp, logp2)
             loss = loss * args.task_weight.get(d, 1.0)
+            if anchor is not None:
+                loss = loss + args.l2sp * sum(((p - p0) ** 2).sum() for p, p0 in zip(enc_params, anchor))
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -209,7 +257,14 @@ def main():
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
-    ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
+    ap.add_argument("--cons", type=float, default=0.0,
+                    help="consistency weight: symmetric KL between a row and its augmented copy "
+                         "(R-Drop on the same row when --augment 0), e.g. 1.0")
+    ap.add_argument("--l2sp", type=float, default=0.0,
+                    help="L2-SP anchor weight toward the pretrained encoder, e.g. 1e-4")
+    ap.add_argument("--gce", type=float, default=0.0,
+                    help="generalised cross-entropy q for route/approve (noisy labels), e.g. 0.7; 0 = CE")
+    ap.add_argument("--augment_tasks",default="", help="decisions that see augmented rows, e.g. grounded (default all)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
