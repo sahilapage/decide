@@ -1,0 +1,10 @@
+# Serving. Bounded rather than hard-pinned: an exact pin of a version that
+# predates your Python build will try to compile from source and fail.
+# Record the versions you actually used in your README.
+fastapi>=0.115,<1.0
+uvicorn>=0.32,<1.0
+
+# pydantic comes in with fastapi; let it resolve a build that matches your Python.
+
+# selfcheck.py uses only the standard library.
+# Add whatever your model needs below, with the same style of bound.
