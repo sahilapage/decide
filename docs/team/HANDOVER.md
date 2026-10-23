@@ -4,22 +4,22 @@ Date: 2026-10-24. Repo: https://github.com/sahilapage/decide (`main`).
 
 ## 1. Read these first, in order
 
-1. `context.md`: the full log.
+1. `docs/team/context.md`: the full log.
    * Sections 1–14 are Sahil's side: task, data findings, architecture, results, failed experiments, gotchas, file map, judge Q&A.
    * Section 15 is Arhan's side: independent verification, the second GPU box, research verdicts on test-time training and RL.
 2. `README.md` and `model_card.md`: the submission-facing docs.
 3. `docs/benchmarks.md`: latency numbers, and why int8 is not shipped.
-4. `research_notes/Decide frontier research survey/*.md`: the frontier research survey (section 4 below).
+4. `docs/research/notes/*.md`: the frontier research survey (section 4 below).
 
 ## 2. Current state (all verified)
 
-* **Shipped model:** `artifacts/student/`, Ettin-17M multi-task, recipe `v6t2` seed 3, fp32 ONNX, 68 MB.
+* **Shipped model:** `artifacts/student/`, Ettin-17M multi-task, recipe `v6t2` seed 3, fp32 ONNX, 68 MB, plus the approve second stage (`approve_stage.json`, `decide/approve_stage.py`).
   * This recipe augments the grounded batches, now including `kb_trim`.
-  * Earlier models are tagged `v5-e17-s3` and `v6c2-s0`.
+  * Earlier models are tagged `v5-e17-s3`, `v6c2-s0` and `v6t2-s3`.
 * **Score:**
-  * dev `selfcheck.py` over HTTP from a fresh clone = **84.98 / 100**
-  * cross-fitted (honest) estimate = **84.1**
-  * route acc 89.1%, approve acc 89.0% (cost 0.204 vs always-hold 0.368), grounded 100%
+  * dev `selfcheck.py` over HTTP from a fresh clone = **85.87 / 100**
+  * cross-fitted (honest) estimate = **85.1**
+  * route acc 89.1%, approve acc 89.9% (cost 0.201 vs always-hold 0.405), grounded 100%
   * hand-written judge cases: 25/26
 * **Latency (p95):** 6.3 ms over HTTP on 2 physical cores (4 logical), about 2.5 ms on a Mac (M5).
 * **Robustness:** mean over shifts never seen in training 83.8 (old model 82.5); worst variant 78.1 (was 65.2). See `docs/robustness.md`.
@@ -29,20 +29,20 @@ Quick check from a fresh clone:
 
 ```bash
 ./start.sh &                         # serves :8000
-python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~85.0
+python selfcheck.py --url http://localhost:8000/v1/decide   # expect ~85.9
 ```
 
 The dataset (`data/*.jsonl`) is **not in git**. It is gitignored because it was handed to participants. Copy it from:
 * the starter folder: `~/Downloads/Final_Hackathon_PS_Decide/starter`, or
-* the GPU box: `~/sahil/decide/data`
+* the training GPU box (copy kept next to the checkout)
 
 ## 3. Machines
 
 | Box | Access | Where things are |
 |---|---|---|
-| RTX 4090 (Sahil) | `ssh sra@10.27.100.101` | `~/sahil/decide`: venv built with `--system-site-packages` on `~/miniconda3/envs/trackeverything` (torch 2.8, transformers 5.20). Training runs in `runs/`, exports in `exports/` (gitignored, only on this box). Final export: `exports/final_e17_s3`. |
-| RTX 3060 (Arhan) | `ssh sra@10.1.205.86` (password: ask Arhan, never commit) | `~/Arhan/decide`, `conda activate decide` |
-| Mac (Sahil) | local | `/Users/sahilapage/cognext`, the git checkout. A demo server may still be running on 127.0.0.1:8000. |
+| RTX 4090 (Sahil) | SSH (lab network; ask Sahil) | the repo checkout: venv built with `--system-site-packages` on an existing conda env (torch 2.8, transformers 5.20). Training runs in `runs/`, exports in `exports/` (gitignored, only on this box). Final export: `exports/final_e17_s3`. |
+| RTX 3060 (Arhan) | SSH (lab network; ask Arhan) | the repo checkout, conda env `decide` |
+| Mac (Sahil) | local | the main git checkout. A demo server may still be running on 127.0.0.1:8000. |
 
 **Gotchas:**
 * Never use `pkill -f <pattern>` over SSH (it kills your own session). Use `pgrep -f "[t]rain_mt.py"`.
@@ -67,7 +67,7 @@ list what's hype.
 | Selective prediction / abstention / cost-sensitive decisions (incl. the kNN-confidence idea) | `abstention_cost_decisions.md` | was running; **re-run if missing** |
 
 After all six exist, write the combined report to
-`reports/Decide frontier research survey.md`. Each idea should get its expected gain, cost
+`docs/research/frontier_survey.md`. Each idea should get its expected gain, cost
 in hours, and how it holds up on a new dataset.
 
 ### Key findings so far (from the 3 finished tracks)
@@ -95,8 +95,8 @@ in hours, and how it holds up on a new dataset.
   * The hidden test is the held-back ~20% of the **same** dataset.
   * "Data generation or collection" is out of scope, so no public datasets or LLM-written tickets in training.
   * "Pretraining a language model from scratch" is out of scope.
-* **Research report:** `reports/Decide frontier research survey.md`, with the notes in `research_notes/`.
-* **Seed ensemble:** no gain. The 4-seed average scores 84.0, against 84.8 for the old shipped seed (see `context.md` §7).
+* **Research report:** `docs/research/frontier_survey.md`, with the notes in `docs/research/notes/`.
+* **Seed ensemble:** no gain. The 4-seed average scores 84.0, against 84.8 for the old shipped seed (see `docs/team/context.md` §7).
 * **Stress test** (`tools/stress_test.py`): the same dev tickets, rewritten.
   * Route and approve are robust.
   * Grounded was brittle: typos 0.81, KB reorder 0.83, extra KB sentence 0.74.
@@ -134,7 +134,17 @@ in hours, and how it holds up on a new dataset.
 3. **Before judging:**
    * Ask the mentors whether the judge box has internet for `pip install`.
    * Give the judges the host:port.
-   * Consider removing the internal IPs from `context.md`.
+   * Internal IPs and paths were removed from these notes (keep it that way).
+
+## 7. Approve second stage (latest)
+
+* `tools/fit_approve_stage.py runs/<folds> runs/<full>` fits the stage on out-of-fold logits and writes `runs/<folds>_st` and `runs/<full>_st`.
+* Then `finalize.sh` / `eval_candidates.sh` run on those directories as usual.
+* Result: +1.0 cross-fitted, and the shipped model scores 85.87 from a fresh clone.
+* Also measured:
+  * The hidden-history refusals are unpredictable (AUC 0.46–0.52).
+  * The coverage floor (0.80–0.85) makes no difference.
+  * JAX would not help: serving is CPU, one request at a time, already 6 ms.
 
 Rule kept all along: quote the cross-fitted number next to the in-sample one,
 and never ship anything that hasn't gone through a full-dev `selfcheck.py`

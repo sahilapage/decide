@@ -30,7 +30,7 @@ correctly refuses to answer, and explain one trade-off.
 * **Case 2:** "Can someone help with my account please" gives a near-flat queue distribution (top probability about 0.34), and the model abstains.
 * **Case 4:** the same refund on the Free tier at $8, $22 and $60:
   * $8 is approved (p 0.84).
-  * $22 abstains: p 0.80 is close to the 0.75 break-even of the 3:1 cost.
+  * $22 abstains: p 0.61 is below the 0.75 break-even of the 3:1 cost, and the model is unsure, so a human decides.
   * $60 is held (p ≈ 0).
 
 > "The 3:1 cost means we approve only when p > 0.75, because 3·(1−p) < p. Near the cap we hand the case to a human."
@@ -53,7 +53,8 @@ correctly refuses to answer, and explain one trade-off.
 
 | Question | Answer |
 |---|---|
-| "Is it really one model?" | Yes. One encoder and one ONNX graph with three outputs; the prompt names the question. A fourth decision is one prompt and a small head (`decide/net.py`). |
+| "Is it really one model?" | Yes. One encoder and one ONNX graph with three outputs; the prompt names the question. |
+| "Is it extendable? Can you add a fourth decision?" | Yes, and we measured it (`docs/extensibility.md`). We trained on route + approve only, then added grounded later as if it were new: one prompt, one head, 89 s of training on the existing model. It scored 83.2 against 83.6 for joint training (noise ±1.1), and route/approve kept their accuracy. Head-only on a frozen encoder keeps the old answers bit-identical, but only reaches 83% on grounded, so a decision that needs a new skill gets the short fine-tune. |
 | "Why not 99% on route?" | About 5–6% of route labels are random (the brief says so). Our most confident 10% are still wrong 5.5% of the time, which is the floor. |
 | "Why not RL or test-time training?" | Every example is labelled, so RL reduces to cost-sensitive classification, and the 0.75 threshold is the exact optimum. Test-time adaptation makes wrong answers more confident. |
 | "Overfit to dev?" | Network weights never see dev. Dev only fits 3 calibration scales and the abstain thresholds. We report the cross-fitted number. |

@@ -25,6 +25,7 @@ QUEUES: List[str] = ["billing", "technical", "account", "shipping", "general"]
 class DecisionModel:
     def __init__(self, artifacts_dir: str = "artifacts") -> None:
         self.artifacts_dir = artifacts_dir
+        self.approve_stage = None
         student_dir = os.path.join(artifacts_dir, "student")
         has_student = os.path.exists(os.path.join(student_dir, "meta.json"))
         if has_student and os.environ.get("DECIDE_BACKEND") != "baseline":
@@ -32,6 +33,11 @@ class DecisionModel:
             self.backend = "student"
             self.net = StudentRuntime(student_dir)
             self.policy = Policy.load(os.path.join(student_dir, "policy.json"))
+            # optional second stage of the approve head (decide/approve_stage.py)
+            stage_path = os.path.join(student_dir, "approve_stage.json")
+            if os.path.exists(stage_path):
+                from decide.approve_stage import ApproveStage
+                self.approve_stage = ApproveStage.load(stage_path)
         else:
             self.backend = "baseline"
             with open(os.path.join(artifacts_dir, "baseline.pkl"), "rb") as fh:
@@ -46,7 +52,10 @@ class DecisionModel:
     # -- raw logits from the shared backbone ---------------------------------
     def _logit(self, decision: str, state: Dict[str, Any]):
         if self.backend == "student":
-            return self.net.logits(decision, state)
+            z = self.net.logits(decision, state)
+            if decision == "approve" and self.approve_stage is not None:
+                z = self.approve_stage.logit(float(z), state)
+            return z
         if decision == "route":
             return self.net.h_route.decision_function(self.net.bb.route_x([state]))[0]
         if decision == "approve":

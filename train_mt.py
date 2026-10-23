@@ -16,6 +16,7 @@ import json
 import math
 import os
 import random
+import re
 import time
 
 import numpy as np
@@ -83,6 +84,23 @@ def predict(model, tok, feats, tabs, device, bs=128):
     return res
 
 
+def two_class(z):
+    """Binary logit -> 2-class log-probs, so binaries share the route KL code."""
+    return F.log_softmax(torch.stack([torch.zeros_like(z), z], -1), -1)
+
+
+def sym_kl(logp, logq):
+    """Symmetric KL between two batches of log-prob rows (consistency / R-Drop)."""
+    p, q = logp.exp(), logq.exp()
+    return 0.5 * ((p * (logp - logq)).sum(-1) + (q * (logq - logp)).sum(-1)).mean()
+
+
+def gce(logp, tgt, q):
+    """Generalised cross-entropy (Zhang & Sabuncu 2018): (1 - p^q)/q, robust to flipped labels.
+    q -> 0 recovers cross-entropy, q = 1 is MAE. Soft targets weight each class."""
+    return (tgt * (1 - logp.exp().clamp_min(1e-6) ** q) / q).sum(-1).mean()
+
+
 def train_one(args, tr_rows, soft, device, eval_sets):
     """soft: dict with teacher probs aligned to tr_rows or None. eval_sets: name -> rows."""
     # Heads always start from the same weights (fixed seed), so runs that differ
@@ -90,7 +108,13 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     # weight-averaged into a soup.
     torch.manual_seed(args.init_seed)
     tok = AutoTokenizer.from_pretrained(args.model)
-    model = DecideNet(args.model, dropout=args.dropout).to(device)
+    model = DecideNet(args.model, dropout=args.dropout, pool=args.pool).to(device)
+    if args.init_from:
+        # extending a trained model: start from its weights (encoder + existing heads)
+        model.load_state_dict(torch.load(args.init_from, map_location=device))
+    if args.freeze_encoder:
+        for p in model.encoder.parameters():
+            p.requires_grad_(False)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -108,12 +132,40 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     y_a = torch.tensor([float(r["labels"]["approve"]) for r in tr_rows])
     y_g = torch.tensor([float(r["labels"]["grounded"]) for r in tr_rows])
 
+    # --tasks: decisions trained in this run. --n_labels: label budget for them (a fixed
+    # random subset of the original rows, plus those rows' augmented copies).
+    # --replay: the other decisions keep that fraction of their batches, so an unfrozen
+    # encoder does not forget them while a new decision is added.
+    tasks = [d for d in DECISIONS if d in args.tasks.split(",")]
+    keep = np.arange(n_orig)
+    if args.n_labels:
+        keep = np.sort(np.random.RandomState(args.seed).permutation(n_orig)[:args.n_labels])
+    copies = 1 + (args.augment if args.augment > 0 else 0)
+
+    # --cons pairs every original row with one of its augmented copies (or, without
+    # augmentation, with itself under a second dropout mask = R-Drop), so batches
+    # are drawn from the originals only and the copy is looked up per step
+    paired = args.cons > 0
+
+    def partner(d, idx):
+        if args.augment > 0 and d in aug_tasks:
+            return idx + n_orig * np.random.randint(1, args.augment + 1, size=len(idx))
+        return idx
+
     # homogeneous batches per decision, interleaved
     def batches():
         out = []
         for d in DECISIONS:
-            # augmented rows only feed the decisions listed in --augment_tasks
-            idx = np.random.permutation(len(tr_rows) if d in aug_tasks else n_orig)
+            if d in tasks:
+                # augmented rows only feed the decisions listed in --augment_tasks
+                # (with --cons they are looked up per step as partners instead)
+                pool = (np.concatenate([keep + c * n_orig for c in range(copies)])
+                        if d in aug_tasks and not paired else keep)
+            elif args.replay > 0:
+                pool = np.random.permutation(n_orig)[:int(args.replay * n_orig)]
+            else:
+                continue
+            idx = np.random.permutation(pool)
             for s in range(0, len(idx), args.bs):
                 out.append((d, idx[s:s + args.bs]))
         random.shuffle(out)
@@ -121,11 +173,50 @@ def train_one(args, tr_rows, soft, device, eval_sets):
 
     steps = args.epochs * len(batches())
     head_params = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
-    enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
-    opt = torch.optim.AdamW([{"params": enc_params, "lr": args.lr},
-                             {"params": head_params, "lr": args.lr * args.head_lr_mult}],
+    enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder.") and p.requires_grad]
+    enc_groups = [{"params": enc_params, "lr": args.lr}]
+    if args.llrd < 1.0:
+        # layer-wise lr decay: top layer gets lr, each layer below x llrd, embeddings lowest
+        n_layers = model.encoder.config.num_hidden_layers
+        by_lr = {}
+        for n, p in model.named_parameters():
+            if not n.startswith("encoder.") or not p.requires_grad:
+                continue
+            m = re.search(r"\.layers?\.(\d+)\.", n)
+            depth = n_layers - 1 - int(m.group(1)) if m else (n_layers if "embed" in n else 0)
+            by_lr.setdefault(args.lr * args.llrd ** depth, []).append(p)
+        enc_groups = [{"params": ps, "lr": lr} for lr, ps in by_lr.items()]
+    opt = torch.optim.AdamW(enc_groups + [{"params": head_params, "lr": args.lr * args.head_lr_mult}],
                             weight_decay=0.01)
     sch = get_cosine_schedule_with_warmup(opt, int(0.06 * steps), steps)
+    # L2-SP anchor: pull encoder weights back toward the pretrained start point
+    anchor = [p.detach().clone() for p in enc_params] if args.l2sp > 0 else None
+
+    def task_loss(d, out, idx):
+        """Returns (loss, log-probs) for decision d on rows idx."""
+        r, a, g = out
+        if d == "route":
+            logp = F.log_softmax(r.float(), -1)
+            hard = F.one_hot(y_r[idx], 5).float().to(device)
+            if soft is not None:
+                tgt = (1 - args.alpha) * hard + args.alpha * torch.from_numpy(soft["route"][idx]).to(device)
+            else:
+                tgt = hard * (1 - args.ls) + args.ls / 5
+        else:
+            z = (a if d == "approve" else g).float()
+            yy = (y_a if d == "approve" else y_g)[idx].to(device)
+            if soft is not None:
+                yy = (1 - args.alpha) * yy + args.alpha * torch.from_numpy(soft[d][idx]).to(device)
+            logp = two_class(z)
+            tgt = torch.stack([1 - yy, yy], -1)
+        # grounded labels are clean (100% on dev), so the noise-robust loss skips it
+        if args.gce > 0 and d != "grounded":
+            return gce(logp, tgt, args.gce), logp
+        if args.focal > 0 and d != "grounded":
+            # focal loss (Lin et al. 2017), no alpha/pos_weight so probabilities stay unbiased
+            return -(tgt * (1 - logp.exp()) ** args.focal * logp).sum(-1).mean(), logp
+        return -(tgt * logp).sum(-1).mean(), logp
+
     ema = None
     if args.ema > 0:
         ema = {k: v.detach().clone().float() for k, v in model.state_dict().items()}
@@ -133,27 +224,25 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     t0 = time.time()
     for ep in range(args.epochs):
         model.train()
+        if args.freeze_encoder:
+            model.encoder.eval()        # frozen features: no dropout noise
         tot = {d: 0.0 for d in DECISIONS}
         cnt = {d: 0 for d in DECISIONS}
         for d, idx in batches():
             b = collate(tok, [feats[d][i] for i in idx], tabs[idx], device)
             with amp(device):
-                r, a, g = model(**b)
-            if d == "route":
-                logp = F.log_softmax(r.float(), -1)
-                hard = F.one_hot(y_r[idx], 5).float().to(device)
-                if soft is not None:
-                    tgt = (1 - args.alpha) * hard + args.alpha * torch.from_numpy(soft["route"][idx]).to(device)
-                else:
-                    tgt = hard * (1 - args.ls) + args.ls / 5
-                loss = -(tgt * logp).sum(-1).mean()
-            else:
-                z = (a if d == "approve" else g).float()
-                yy = (y_a if d == "approve" else y_g)[idx].to(device)
-                if soft is not None:
-                    yy = (1 - args.alpha) * yy + args.alpha * torch.from_numpy(soft[d][idx]).to(device)
-                loss = F.binary_cross_entropy_with_logits(z, yy)
+                out = model(**b)
+            loss, logp = task_loss(d, out, idx)
+            if paired:
+                idx2 = partner(d, idx)
+                b2 = collate(tok, [feats[d][i] for i in idx2], tabs[idx2], device)
+                with amp(device):
+                    out2 = model(**b2)
+                loss2, logp2 = task_loss(d, out2, idx2)
+                loss = 0.5 * (loss + loss2) + args.cons * sym_kl(logp, logp2)
             loss = loss * args.task_weight.get(d, 1.0)
+            if anchor is not None:
+                loss = loss + args.l2sp * sum(((p - p0) ** 2).sum() for p, p0 in zip(enc_params, anchor))
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -209,7 +298,27 @@ def main():
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
+    ap.add_argument("--cons", type=float, default=0.0,
+                    help="consistency weight: symmetric KL between a row and its augmented copy "
+                         "(R-Drop on the same row when --augment 0), e.g. 1.0")
+    ap.add_argument("--l2sp", type=float, default=0.0,
+                    help="L2-SP anchor weight toward the pretrained encoder, e.g. 1e-4")
+    ap.add_argument("--gce", type=float, default=0.0,
+                    help="generalised cross-entropy q for route/approve (noisy labels), e.g. 0.7; 0 = CE")
+    ap.add_argument("--focal", type=float, default=0.0,
+                    help="focal loss gamma for route/approve, e.g. 2.0; 0 = CE")
+    ap.add_argument("--llrd", type=float, default=1.0,
+                    help="layer-wise lr decay per encoder layer below the top, e.g. 0.85; 1 = off")
+    ap.add_argument("--pool", default="mean", choices=["mean", "attn"],
+                    help="attn = learned per-decision attention pooling")
     ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
+    # extending the model with a new decision (see docs/extensibility.md)
+    ap.add_argument("--tasks", default="route,approve,grounded", help="decisions trained in this run")
+    ap.add_argument("--init_from", default="", help="model.pt of a trained DecideNet to start from")
+    ap.add_argument("--freeze_encoder", action="store_true", help="train heads only; other decisions stay bit-identical")
+    ap.add_argument("--n_labels", type=int, default=0, help="label budget for --tasks (0 = all train rows)")
+    ap.add_argument("--replay", type=float, default=0.0,
+                    help="fraction of batches kept for decisions not in --tasks (unfrozen encoder)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}

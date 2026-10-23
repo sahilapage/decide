@@ -38,7 +38,8 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     run_args = json.load(open(os.path.join(args.run, "args.json")))
-    net = DecideNet(os.path.join(args.run, "encoder_config"), from_config=True)
+    net = DecideNet(os.path.join(args.run, "encoder_config"), from_config=True,
+                    pool=run_args.get("pool", "mean"))
     sd = torch.load(os.path.join(args.run, "model.pt"), map_location="cpu")
     net.load_state_dict(sd)
     net.eval()

@@ -49,25 +49,39 @@ spelling, sentence order and length.
 | | accuracy (all) | quality metric (answered) | ECE | Brier skill | coverage |
 |---|---|---|---|---|---|
 | route | 0.891 | macro-F1 0.946 | 0.024 | 0.78 | 0.85 |
-| approve | 0.890 | cost 0.204 (always-hold 0.368) | 0.013 | 0.65 | 0.85 |
+| approve | 0.899 | cost 0.201 (always-hold 0.405) | 0.017 | 0.68 | 0.90 |
 | grounded | 1.000 | macro-F1 1.000 | 0.000 | 1.00 | 1.00 |
 
-Total 85.0 / 100 (quality 0.842, calibration 0.875, latency 1.00, abstention
-0.630), measured from a fresh clone. Cross-fitted dev estimate (policy fitted
-on one half, scored on the other, 10 halves): **84.1** (range 81.6–85.5).
+Total 85.9 / 100 (quality 0.856, calibration 0.876, latency 1.00, abstention
+0.647), measured over HTTP from a fresh clone. Cross-fitted dev estimate (policy
+fitted on one half, scored on the other, 10 halves): **85.1** (range 82.8–86.7).
 Seeds of the same recipe differ by ~1 point on dev and this seed was the
-better of two, so treat ~83.5–84 as the expectation on unseen data.
+better of two, so treat ~84.5–85 as the expectation on unseen data.
 
 p95 latency per call: 6.3 ms over HTTP on 4 logical CPUs (two physical cores of
 an i9-13900K, the shape of a 4-vCPU VM); about 2.5 ms on an Apple M5.
 
 Robustness (`tools/stress_test.py`, `docs/robustness.md`): the same dev tickets
 rewritten with typos, reordered or extra KB sentences, case changes, number
-words, ticket references in the draft, one-sentence KB articles, etc. Mean over
-shifts never used in training: 83.8 (un-augmented model 82.5); worst variant
-78.1 (was 65.2). Hand-written judge-style tickets (`tests/judge_cases.json`):
-25 / 26 as expected; the miss ("Do you have an office in Berlin?") abstains.
+words, ticket references in the draft, one-sentence KB articles, etc. Worst
+variant 78.8 (the un-augmented model fell to 65.2). Hand-written judge-style
+tickets (`tests/judge_cases.json`): 25 / 26 as expected; the miss ("Do you have
+an office in Berlin?") abstains.
 <!-- CARD-RESULTS:END -->
+
+## Approve second stage
+The shared network sees the amount only through coarse tier × amount buckets.
+A 60-tree gradient-boosted stage (`decide/approve_stage.py`) takes the
+network's approve logit plus amount ÷ tier cap (caps estimated from the
+labels: the amount where approval falls to 50%), amount == 0 and five
+disqualifying-phrase flags mined from the training labels. It is fitted on
+out-of-fold network logits, so it corrects the network's real errors:
+approve accuracy 88.5% → 90.3% and Brier 0.094 → 0.076 out of fold, total +1.0
+(6,500 OOF rows, paired sd 0.28; +1.0 on dev cross-fitted too). It runs in
+numpy (~0.1 ms) and changes nothing for route or grounded. Below the cap with
+no disqualifying phrase, ~15% of requests are still refused and nothing in the
+text predicts which (n-gram AUC 0.46, network 0.52): that is the hidden
+account history, and the probabilities top out near 0.85 to say so.
 
 ## Calibration
 Label-noise aware, fitted on out-of-fold predictions:

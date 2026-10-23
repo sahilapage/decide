@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:8014/v1/decide",
+  "url": "http://127.0.0.1:8015/v1/decide",
   "eval": "data/dev.jsonl",
   "n_records": 1500,
   "n_calls": 4500,
@@ -16,19 +16,19 @@
   },
   "latency_ms": {
     "p50": {
-      "route": 4.2841424874495715,
-      "approve": 4.666088003432378,
-      "grounded": 5.996477499138564
+      "route": 4.26394899841398,
+      "approve": 4.725571518065408,
+      "grounded": 5.978166504064575
     },
     "p95": {
-      "route": 5.732052709208801,
-      "approve": 6.125792389502748,
-      "grounded": 7.1156896679895
+      "route": 5.717405411996878,
+      "approve": 6.180558679625392,
+      "grounded": 7.067136510158889
     },
-    "mean_p95": 6.32451158890035,
-    "overall_p50": 4.99596499139443,
-    "overall_p95": 6.735568892327137,
-    "server_self_reported_p95": 6.319,
+    "mean_p95": 6.32170020059372,
+    "overall_p50": 5.01161502324976,
+    "overall_p95": 6.717384600779042,
+    "server_self_reported_p95": 6.291100000000001,
     "reconnects": 0
   },
   "quality": {
@@ -36,53 +36,53 @@
     "route_acc": 0.8906666666666667,
     "coverage": {
       "route": 0.8493333333333334,
-      "approve": 0.8506666666666667,
+      "approve": 0.9033333333333333,
       "grounded": 1.0
     },
-    "approve_cost": 0.20376175548589343,
-    "approve_macro_f1": 0.9229854502960023,
+    "approve_cost": 0.2007380073800738,
+    "approve_macro_f1": 0.9310304382272621,
     "grounded_macro_f1": 1.0,
     "fp_cost": 3.0,
     "trivial": {
       "route_macro_f1": 0.08268991282689912,
-      "approve_cost_always_hold": 0.3675548589341693,
-      "approve_cost_always_approve": 1.8973354231974922,
+      "approve_cost_always_hold": 0.4051660516605166,
+      "approve_cost_always_approve": 1.78450184501845,
       "grounded_macro_f1": 0.3839835728952772
     }
   },
   "calibration": {
     "route_ece": 0.024396844099567116,
-    "approve_ece": 0.012690485170167265,
+    "approve_ece": 0.016665674903663292,
     "grounded_ece": 0.00014044877209831692,
-    "approve_brier": 0.08425357461377261,
+    "approve_brier": 0.07715365331974602,
     "grounded_brier": 3.830638864954463e-06,
-    "mean_ece": 0.012409259347277567,
-    "mean_brier": 0.042128702626318786,
-    "brier_skill": 0.8110783021257618,
+    "mean_ece": 0.013734322591776241,
+    "mean_brier": 0.03857874197930549,
+    "brier_skill": 0.8208427623432044,
     "route_brier": 0.17307949657321953
   },
   "abstention": {
     "risk_at_80": {
       "route": 0.05500000000000005,
-      "approve": 0.06666666666666665,
+      "approve": 0.05583333333333329,
       "grounded": 0.0
     },
     "full_error": {
       "route": 0.10933333333333328,
-      "approve": 0.10999999999999999,
+      "approve": 0.10066666666666668,
       "grounded": 0.0
     },
     "declared_coverage": {
       "route": 0.8493333333333334,
-      "approve": 0.8506666666666667,
+      "approve": 0.9033333333333333,
       "grounded": 1.0
     }
   },
   "score_parts": {
-    "quality": 0.8416373221673856,
-    "calibration": 0.874516002694687,
+    "quality": 0.8563685062159174,
+    "calibration": 0.8760855746921616,
     "latency": 1.0,
-    "abstention": 0.6302968711505295
+    "abstention": 0.6474384859742637
   },
-  "score": 84.98284602132054
+  "score": 85.8684569055547
 }
