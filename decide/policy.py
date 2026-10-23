@@ -50,25 +50,23 @@ def fit_temperature_multiclass(logits: np.ndarray, y: np.ndarray) -> float:
 
 def fit_platt(logit: np.ndarray, y: np.ndarray):
     """Fit p = sigmoid(a * logit + b) by Newton steps on NLL."""
-    a, b = 1.0, 0.0
-    x = logit.astype(np.float64)
-    yy = y.astype(np.float64)
-    for _ in range(100):
-        p = sigmoid(a * x + b)
-        g_a = ((p - yy) * x).mean()
-        g_b = (p - yy).mean()
-        w = p * (1 - p) + 1e-9
-        h_aa = (w * x * x).mean() + 1e-6
-        h_ab = (w * x).mean()
-        h_bb = w.mean() + 1e-6
-        det = h_aa * h_bb - h_ab * h_ab
-        da = (h_bb * g_a - h_ab * g_b) / det
-        db = (h_aa * g_b - h_ab * g_a) / det
-        a -= da
-        b -= db
-        if abs(da) + abs(db) < 1e-9:
-            break
-    return float(a), float(b)
+    from scipy.optimize import minimize
+
+    x = np.asarray(logit, dtype=np.float64)
+    yy = np.asarray(y, dtype=np.float64)
+
+    def nll(w):
+        z = w[0] * x + w[1]
+        # log(1 + e^z) - y z, computed stably
+        return float((np.logaddexp(0.0, z) - yy * z).mean())
+
+    def grad(w):
+        p = sigmoid(w[0] * x + w[1])
+        return np.array([((p - yy) * x).mean(), (p - yy).mean()])
+
+    r = minimize(nll, np.array([1.0, 0.0]), jac=grad, method="L-BFGS-B",
+                 bounds=[(1e-3, 20.0), (-20.0, 20.0)])
+    return float(r.x[0]), float(r.x[1])
 
 
 class Policy:

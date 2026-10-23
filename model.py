@@ -26,7 +26,8 @@ class DecisionModel:
     def __init__(self, artifacts_dir: str = "artifacts") -> None:
         self.artifacts_dir = artifacts_dir
         student_dir = os.path.join(artifacts_dir, "student")
-        if os.path.exists(os.path.join(student_dir, "model.onnx")) and os.environ.get("DECIDE_BACKEND") != "baseline":
+        has_student = os.path.exists(os.path.join(student_dir, "meta.json"))
+        if has_student and os.environ.get("DECIDE_BACKEND") != "baseline":
             from decide.student_runtime import StudentRuntime
             self.backend = "student"
             self.net = StudentRuntime(student_dir)

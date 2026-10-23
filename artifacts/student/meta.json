@@ -1,0 +1,12 @@
+{
+  "max_len": 192,
+  "use_token_type_ids": false,
+  "encoder": "jhu-clsp/ettin-encoder-32m",
+  "inputs": [
+    "input_ids",
+    "attention_mask",
+    "tab"
+  ],
+  "variant": "model.onnx",
+  "source_variant": "model.onnx"
+}

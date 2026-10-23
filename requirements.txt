@@ -1,10 +1,12 @@
-# Serving. Bounded rather than hard-pinned: an exact pin of a version that
-# predates your Python build will try to compile from source and fail.
-# Record the versions you actually used in your README.
+# Serving (CPU only). Bounded rather than hard-pinned so pip picks a wheel
+# that matches the judges' Python; the versions we ran are in the README.
 fastapi>=0.115,<1.0
 uvicorn>=0.32,<1.0
+numpy>=1.26,<3.0
+onnxruntime>=1.20,<2.0
+tokenizers>=0.20,<1.0
+# only needed for the gate-1 baseline fallback and for fitting the policy
+scikit-learn>=1.5,<2.0
+scipy>=1.11,<2.0
 
-# pydantic comes in with fastapi; let it resolve a build that matches your Python.
-
-# selfcheck.py uses only the standard library.
-# Add whatever your model needs below, with the same style of bound.
+# Training (GPU box only, not needed to serve): see requirements-train.txt
