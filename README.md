@@ -10,11 +10,11 @@ with no network calls.
 | dev split, via `selfcheck.py` against the live service | |
 |---|---|
 | route | acc 0.891, macro-F1 (answered) 0.946, coverage 0.85 |
-| approve | acc 0.890, cost 0.204 vs always-hold 0.368 (3:1), coverage 0.85 |
+| approve | acc 0.899, cost 0.201 vs always-hold 0.405 (3:1), coverage 0.90 |
 | grounded | acc 1.000, macro-F1 1.000, coverage 1.00 |
-| mean ECE / Brier skill | 0.012 / 0.811 |
+| mean ECE / Brier skill | 0.014 / 0.821 |
 | p95 latency (mean of 3 decisions) | 6.3 ms over HTTP on 4 logical CPUs (2 physical cores, i9-13900K); ~2.5 ms on an Apple M5 |
-| **selfcheck total** | **85.0 / 100** (cross-fitted estimate 84.1, see model card) |
+| **selfcheck total** | **85.9 / 100** (cross-fitted estimate 85.1, see model card) |
 | shifted-dev stress test (typos, reordered/extra KB sentences, ticket refs, one-sentence KBs…) | held-out-shift mean 83.8 vs 82.5 for the un-augmented model; worst case 78 vs 65, see `docs/robustness.md` |
 | hand-written judge-style cases (`tests/judge_cases.json`) | 25 / 26 as expected (the miss abstains) |
 <!-- RESULTS:END -->
@@ -115,7 +115,10 @@ parameters for a binary question), trained on top of the same encoder.
     many, share supported) go into the grounded head next to the encoder
     output. The encoder handles the non-numeric slots.
 * **approve** depends on more than words: per-tier amount caps and a few
-  disqualifying phrases, plus account history the ticket never mentions. The
+  disqualifying phrases, plus account history the ticket never mentions.
+  A small second stage (`decide/approve_stage.py`, 60 trees, numpy-only)
+  refines the shared network's approve logit with amount ÷ tier cap (caps
+  learned from the labels) and the phrase flags: +1.0 point cross-fitted. The
   approve head sees the pooled text *and* a tabular vector (tier one-hot,
   tier × amount bucket, log amount). With calibrated `p`, the 3:1 cost makes
   approving right only when `3(1−p) < p`, i.e. **p > 0.75**.

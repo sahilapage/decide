@@ -111,6 +111,9 @@ Hand-written, judge-style tickets (`tests/judge_cases.json`, 26 cases) exposed o
 The TinyLettuce start was level on clean data and no better on the shifts, so we kept the plain Ettin initialisation.
 
 Fresh-clone `selfcheck.py` for v6t2 s3: **84.98**, all gates PASS, p95 6.3 ms.
+With the approve second stage added (model card, "Approve second stage"):
+**85.87**, cross-fitted 85.1; robustness unchanged (kb_single 78.8,
+draft_ticket_ref 85.4, judge cases 25 / 26).
 
 ### Cost on clean data
 
