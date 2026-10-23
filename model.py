@@ -35,7 +35,7 @@ class DecisionModel:
             self.policy = Policy.load(os.path.join(student_dir, "policy.json"))
             # optional second stage of the approve head (decide/approve_stage.py)
             stage_path = os.path.join(student_dir, "approve_stage.json")
-            if os.path.exists(stage_path):
+            if os.path.exists(stage_path) and not self.net.stage_in_graph:
                 from decide.approve_stage import ApproveStage
                 self.approve_stage = ApproveStage.load(stage_path)
         else:

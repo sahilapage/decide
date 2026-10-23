@@ -29,8 +29,9 @@ def main():
             fh.write(data[i:i + CHUNK])
     shutil.copy(os.path.join(args.export_dir, "tokenizer.json"), args.out)
     stage = os.path.join(args.export_dir, "approve_stage.json")
-    if os.path.exists(stage):
-        shutil.copy(stage, args.out)
+    meta = json.load(open(os.path.join(args.export_dir, "meta.json")))
+    if os.path.exists(stage) and not meta.get("stage_in_graph"):
+        shutil.copy(stage, args.out)   # numpy fallback; not needed once the trees are in the graph
     meta = json.load(open(os.path.join(args.export_dir, "meta.json")))
     meta["variant"] = "model.onnx"
     meta["source_variant"] = args.variant
