@@ -30,7 +30,9 @@ class StudentRuntime:
         so.intra_op_num_threads = int(os.environ.get("DECIDE_THREADS", meta.get("threads", 4)))
         so.inter_op_num_threads = 1
         so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        so.add_session_config_entry("session.intra_op.allow_spinning", "1")
+        # spinning keeps idle threads hot; it hurts when threads > physical cores
+        so.add_session_config_entry("session.intra_op.allow_spinning",
+                                    os.environ.get("DECIDE_SPIN", "1"))
         path = os.path.join(folder, variant)
         if os.path.exists(path):
             src = path
