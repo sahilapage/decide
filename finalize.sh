@@ -14,4 +14,5 @@ $P fit_policy_dev.py "$DEPLOY/dev_logits.npz" --struct "$DEPLOY/struct_policy.js
   | grep -E "cross-fitted|TOTAL|route|approve|ground" || true
 $P export_onnx.py "$DEPLOY" "$OUT" --policy "$DEPLOY/policy.json" > /dev/null 2>&1
 cp "$DEPLOY/dev_logits.npz" "$OUT/"
+[ -f "$DEPLOY/approve_stage.json" ] && cp "$DEPLOY/approve_stage.json" "$OUT/"
 taskset -c 0-3 $P bench_cpu.py "$OUT" --n 300 --threads 4 --variants model.onnx | grep -v -i warn
