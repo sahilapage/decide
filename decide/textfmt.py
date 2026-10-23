@@ -20,7 +20,7 @@ import re
 
 import numpy as np
 
-from decide.normalize import normalize
+from decide.normalize import damerau1, normalize
 
 DECISIONS = ("route", "approve", "grounded")
 TIERS = ["free", "pro", "enterprise"]
@@ -57,6 +57,44 @@ def scope_broadened(draft: str, kb: str) -> bool:
 
 def number_facts(text: str) -> set:
     return {(re.sub(r"\s+", "", m.group(1)), m.group(2).lower()) for m in _FACT.finditer(text)}
+
+
+def _unit_match(a: str, b: str) -> bool:
+    """Same unit word, allowing plural/singular and one typo in words of 4+ letters."""
+    if a == b:
+        return True
+    if min(len(a), len(b)) >= 4 and damerau1(a, b):
+        return True
+    a, b = a.rstrip("s"), b.rstrip("s")
+    if a == b:
+        return True
+    return min(len(a), len(b)) >= 4 and damerau1(a, b)
+
+
+_TICKET_NUM = re.compile(r"\d+(?:\.\d+)?")
+_ID_NUM = re.compile(r"#\s*(\d+)")
+
+
+def ticket_numbers(state: Dict[str, Any]) -> set:
+    """Numbers the customer's own ticket contains (subject, body, amount), plus '#123' style IDs in the draft."""
+    # Only identifier-like numbers (4+ digits) and money with cents: small
+    # integers ("two weeks", "the 14th") collide with real policy numbers.
+    nums = set()
+    for k in ("subject", "body"):
+        nums.update(n for n in _TICKET_NUM.findall(str(state.get(k) or "")) if len(n) >= 4 or "." in n)
+    try:
+        amt = float(state.get("amount") or 0.0)
+        if amt > 0:
+            nums.add("%.2f" % amt)
+    except (TypeError, ValueError):
+        pass
+    nums.update(_ID_NUM.findall(str(state.get("draft_reply") or "")))
+    return nums
+
+
+def fact_supported(fact, kb_facts) -> bool:
+    num, unit = fact
+    return any(n == num and _unit_match(unit, u) for n, u in kb_facts)
 
 PROMPT_SETS = {
     # full natural-language questions
@@ -103,10 +141,13 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     kn = normalize(str(state.get("kb_article") or ""))
     d = number_facts(dn)
     k = number_facts(kn)
-    extra = d - k
+    # A number the reply copies from the ticket itself (order "#48213", the
+    # charged amount) is not a policy claim, so the article need not state it.
+    tnums = ticket_numbers(state)
+    extra = {f for f in d if not fact_supported(f, k) and f[0] not in tnums}
     v[APPROVE_DIM] = 1.0 if extra else 0.0
     v[APPROVE_DIM + 1] = min(len(extra), 3) / 3.0
-    v[APPROVE_DIM + 2] = (len(d & k) / len(d)) if d else 1.0
+    v[APPROVE_DIM + 2] = (1 - len(extra) / len(d)) if d else 1.0
     v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
     return v
 

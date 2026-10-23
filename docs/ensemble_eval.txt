@@ -1,0 +1,28 @@
+s0             n=1  cross-fit 82.73 (sd 1.17) | quality 0.8123 calib 0.8339 abst 0.6260
+s1             n=1  cross-fit 83.82 (sd 1.16) | quality 0.8269 calib 0.8475 abst 0.6373
+s2             n=1  cross-fit 83.73 (sd 0.94) | quality 0.8253 calib 0.8497 abst 0.6319
+s3             n=1  cross-fit 84.78 (sd 1.02) | quality 0.8474 calib 0.8384 abst 0.6617
+s0+s1          n=2  cross-fit 83.57 (sd 1.06) | quality 0.8206 calib 0.8481 abst 0.6362
+s0+s2          n=2  cross-fit 83.68 (sd 1.14) | quality 0.8258 calib 0.8522 abst 0.6227
+s0+s3          n=2  cross-fit 84.15 (sd 1.01) | quality 0.8377 calib 0.8437 abst 0.6367
+s1+s2          n=2  cross-fit 84.03 (sd 1.02) | quality 0.8270 calib 0.8538 abst 0.6405
+s1+s3          n=2  cross-fit 84.63 (sd 1.07) | quality 0.8459 calib 0.8498 abst 0.6364
+s2+s3          n=2  cross-fit 84.34 (sd 1.01) | quality 0.8356 calib 0.8527 abst 0.6399
+s0+s1+s2       n=3  cross-fit 83.83 (sd 1.00) | quality 0.8254 calib 0.8549 abst 0.6290
+s0+s1+s3       n=3  cross-fit 84.24 (sd 1.06) | quality 0.8347 calib 0.8496 abst 0.6409
+s0+s2+s3       n=3  cross-fit 83.90 (sd 0.95) | quality 0.8300 calib 0.8488 abst 0.6322
+s1+s2+s3       n=3  cross-fit 84.33 (sd 1.07) | quality 0.8360 calib 0.8549 abst 0.6341
+s0+s1+s2+s3    n=4  cross-fit 84.01 (sd 0.99) | quality 0.8293 calib 0.8515 abst 0.6371
+
+mean single seed: 83.77
+s0+s1          vs mean single: -0.20 (paired sd 0.30)
+s0+s2          vs mean single: -0.09 (paired sd 0.42)
+s0+s3          vs mean single: +0.38 (paired sd 0.31)
+s1+s2          vs mean single: +0.26 (paired sd 0.24)
+s1+s3          vs mean single: +0.86 (paired sd 0.44)
+s2+s3          vs mean single: +0.57 (paired sd 0.38)
+s0+s1+s2       vs mean single: +0.06 (paired sd 0.25)
+s0+s1+s3       vs mean single: +0.47 (paired sd 0.38)
+s0+s2+s3       vs mean single: +0.14 (paired sd 0.27)
+s1+s2+s3       vs mean single: +0.56 (paired sd 0.30)
+s0+s1+s2+s3    vs mean single: +0.25 (paired sd 0.38)

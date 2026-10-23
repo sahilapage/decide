@@ -9,12 +9,13 @@ with no network calls.
 <!-- RESULTS:START -->
 | dev split, via `selfcheck.py` against the live service | |
 |---|---|
-| route | acc 0.883, macro-F1 (answered) 0.943, coverage 0.89 |
-| approve | cost 0.191 vs always-hold 0.374 (3:1), coverage 0.85 |
+| route | acc 0.889, macro-F1 (answered) 0.942, coverage 0.89 |
+| approve | acc 0.893, cost 0.204 vs always-hold 0.360 (3:1), coverage 0.85 |
 | grounded | acc 1.000, macro-F1 1.000, coverage 1.00 |
-| mean ECE / Brier skill | 0.023 / 0.806 |
-| p95 latency (mean of 3 decisions) | 2.5 ms over HTTP (Apple M5); 5.4 ms in-process on 2 physical cores of an i9-13900K |
-| **selfcheck total** | **85.2 / 100** (cross-fitted estimate 84.7, see model card) |
+| mean ECE / Brier skill | 0.015 / 0.811 |
+| p95 latency (mean of 3 decisions) | 6.3 ms over HTTP on 4 logical CPUs (2 physical cores, i9-13900K); ~2.5 ms on an Apple M5 |
+| **selfcheck total** | **84.7 / 100** (cross-fitted estimate 83.8, see model card) |
+| shifted-dev stress test (typos, reordered/extra KB sentences, ticket refs…) | mean 83.0 vs 78.3 for the un-augmented model, see `docs/robustness.md` |
 <!-- RESULTS:END -->
 
 ## Start it (one command)
@@ -136,10 +137,12 @@ parameters for a binary question), trained on top of the same encoder.
 pip install -r requirements-train.txt                       # GPU box
 python train_baseline.py                                    # gate-1 sparse baseline
 M=jhu-clsp/ettin-encoder-17m
-python train_mt.py --model $M --out runs/v5_e17 --epochs 6 --lr 1e-4 --prompt short          # 5-fold OOF
-python train_mt.py --model $M --out runs/v5h_e17_s3 --full --epochs 6 --lr 1e-4 --prompt short --seed 3
-./finalize.sh runs/v5_e17 runs/v5h_e17_s3 exports/final_e17_s3   # calibrate, export, benchmark
-python pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
+C="--model $M --epochs 6 --lr 1e-4 --prompt short --augment 2 --augment_tasks grounded"
+python train_mt.py $C --out runs/v6c2_e17                       # 5-fold OOF
+python train_mt.py $C --out runs/v6c2h_e17_s0 --full --seed 0  # shipped network
+./finalize.sh runs/v6c2_e17 runs/v6c2h_e17_s0 exports/v6c2h_s0   # calibrate, export, benchmark
+python pack_student.py exports/v6c2h_s0 exports/v6c2h_s0/policy.json
+python tools/stress_test.py                                     # shifted-dev robustness check
 ```
 
 ## Pretrained components and licences

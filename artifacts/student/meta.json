@@ -7,7 +7,5 @@
     "attention_mask",
     "tab"
   ],
-  "prompt_style": "short",
-  "variant": "model.onnx",
-  "source_variant": "model.onnx"
+  "prompt_style": "short"
 }
