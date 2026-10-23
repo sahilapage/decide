@@ -91,6 +91,12 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     torch.manual_seed(args.init_seed)
     tok = AutoTokenizer.from_pretrained(args.model)
     model = DecideNet(args.model, dropout=args.dropout).to(device)
+    if args.init_from:
+        # extending a trained model: start from its weights (encoder + existing heads)
+        model.load_state_dict(torch.load(args.init_from, map_location=device))
+    if args.freeze_encoder:
+        for p in model.encoder.parameters():
+            p.requires_grad_(False)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -108,12 +114,29 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     y_a = torch.tensor([float(r["labels"]["approve"]) for r in tr_rows])
     y_g = torch.tensor([float(r["labels"]["grounded"]) for r in tr_rows])
 
+    # --tasks: decisions trained in this run. --n_labels: label budget for them (a fixed
+    # random subset of the original rows, plus those rows' augmented copies).
+    # --replay: the other decisions keep that fraction of their batches, so an unfrozen
+    # encoder does not forget them while a new decision is added.
+    tasks = [d for d in DECISIONS if d in args.tasks.split(",")]
+    keep = np.arange(n_orig)
+    if args.n_labels:
+        keep = np.sort(np.random.RandomState(args.seed).permutation(n_orig)[:args.n_labels])
+    copies = 1 + (args.augment if args.augment > 0 else 0)
+
     # homogeneous batches per decision, interleaved
     def batches():
         out = []
         for d in DECISIONS:
-            # augmented rows only feed the decisions listed in --augment_tasks
-            idx = np.random.permutation(len(tr_rows) if d in aug_tasks else n_orig)
+            if d in tasks:
+                # augmented rows only feed the decisions listed in --augment_tasks
+                pool = (np.concatenate([keep + c * n_orig for c in range(copies)])
+                        if d in aug_tasks else keep)
+            elif args.replay > 0:
+                pool = np.random.permutation(n_orig)[:int(args.replay * n_orig)]
+            else:
+                continue
+            idx = np.random.permutation(pool)
             for s in range(0, len(idx), args.bs):
                 out.append((d, idx[s:s + args.bs]))
         random.shuffle(out)
@@ -121,7 +144,7 @@ def train_one(args, tr_rows, soft, device, eval_sets):
 
     steps = args.epochs * len(batches())
     head_params = [p for n, p in model.named_parameters() if not n.startswith("encoder.")]
-    enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder.")]
+    enc_params = [p for n, p in model.named_parameters() if n.startswith("encoder.") and p.requires_grad]
     opt = torch.optim.AdamW([{"params": enc_params, "lr": args.lr},
                              {"params": head_params, "lr": args.lr * args.head_lr_mult}],
                             weight_decay=0.01)
@@ -133,6 +156,8 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     t0 = time.time()
     for ep in range(args.epochs):
         model.train()
+        if args.freeze_encoder:
+            model.encoder.eval()        # frozen features: no dropout noise
         tot = {d: 0.0 for d in DECISIONS}
         cnt = {d: 0 for d in DECISIONS}
         for d, idx in batches():
@@ -210,6 +235,13 @@ def main():
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
     ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
+    # extending the model with a new decision (see docs/extensibility.md)
+    ap.add_argument("--tasks", default="route,approve,grounded", help="decisions trained in this run")
+    ap.add_argument("--init_from", default="", help="model.pt of a trained DecideNet to start from")
+    ap.add_argument("--freeze_encoder", action="store_true", help="train heads only; other decisions stay bit-identical")
+    ap.add_argument("--n_labels", type=int, default=0, help="label budget for --tasks (0 = all train rows)")
+    ap.add_argument("--replay", type=float, default=0.0,
+                    help="fraction of batches kept for decisions not in --tasks (unfrozen encoder)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}

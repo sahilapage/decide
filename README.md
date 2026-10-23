@@ -88,8 +88,15 @@ JSON responses. `python demo.py` runs the same cases in the terminal.
 * `artifacts/student/model.onnx` — one graph, three outputs. Every call runs
   the shared encoder once; the API returns the head that was asked for.
 
-A fourth decision is one more prompt string and one more linear head (~400
-parameters for a binary question), trained on top of the same encoder.
+**A fourth decision is cheap, and we measured it** ([docs/extensibility.md](docs/extensibility.md)).
+We trained on route + approve only, then added grounded afterwards as if it
+were new: one prompt string, one head, and **89 s** of training on top of the
+existing model, with a share of old-decision batches replayed. It scored
+**83.2** on dev against **83.6** for training all three together (cross-fit
+noise ±1.1), with grounded at 99.9%. Route and approve kept their accuracy
+(within 1 point). Adding only the head on a frozen encoder keeps the other
+answers bit-identical, but reaches only 83% on grounded, because comparing two
+texts is a skill the encoder has to learn.
 
 ### Why each question is shaped differently
 
