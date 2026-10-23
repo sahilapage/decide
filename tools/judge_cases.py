@@ -30,12 +30,15 @@ def main():
         else:
             v, p, ab = getattr(m, c["decision"])(s)
         good = v == c["expect"]
+        safe = (not good) and ab and c.get("allow_abstain", False)
         ok += good
+        safe_n = locals().get("safe_n", 0) + safe
         n += 1
-        print("%-4s %-8s expect %-9s got %-9s p %.3f %s %s  (%s)" % (
+        print("%-5s %-8s expect %-9s got %-9s p %.3f %s %s  (%s)" % (
             c["id"], c["decision"], c["expect"], v, p, "abstain" if ab else "       ",
-            "OK " if good else "XX ", c["why"]))
-    print("\n%d / %d as expected" % (ok, n))
+            "OK  " if good else ("SAFE" if safe else "XX  "), c["why"]))
+    print("\n%d / %d as expected%s" % (ok, n, (", %d more abstained where that is acceptable" % safe_n)
+                                       if locals().get("safe_n") else ""))
 
 
 if __name__ == "__main__":

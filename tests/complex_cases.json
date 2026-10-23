@@ -1,0 +1,467 @@
+[
+ {
+  "id": "cr1",
+  "decision": "route",
+  "expect": "billing",
+  "allow_abstain": false,
+  "why": "multi-issue, main ask billing, shipping distractor",
+  "state": {
+   "subject": "A few things",
+   "body": "Hi team, a couple of things. Separately, less urgent: the tracking page for my last order looks odd. But the main thing I need resolved is that I was charged twice for my Pro subscription this month, two identical charges of $29 on the 3rd. Please reverse one of them. Thanks, Dana",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr2",
+  "decision": "route",
+  "expect": "technical",
+  "allow_abstain": false,
+  "why": "multi-issue, main ask technical, billing distractor",
+  "state": {
+   "subject": "sync",
+   "body": "The main thing I need resolved: calendar sync has stopped working on every device since your update, events created on my phone never show on desktop. Also, less urgent, can you tell me when my next invoice is due?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr3",
+  "decision": "route",
+  "expect": "shipping",
+  "allow_abstain": false,
+  "why": "all caps, typos, anger",
+  "state": {
+   "subject": "WHERE IS MY ORDER",
+   "body": "MY PACKAGE NEVR ARRIVED!!! ordr 55123 tracking has been stuck for 2 weeks and nobody answers. this is ridiculous",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr4",
+  "decision": "route",
+  "expect": "account",
+  "allow_abstain": false,
+  "why": "access problem, invoice mentioned in passing",
+  "state": {
+   "subject": "locked out",
+   "body": "I've tried resetting my password four times, the reset emails never come and now the account says it is locked. I need to download an invoice for my accountant but I can't get in.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr5",
+  "decision": "route",
+  "expect": "billing",
+  "allow_abstain": false,
+  "why": "quoted thread + signature",
+  "state": {
+   "subject": "Re: Re: duplicate payment",
+   "body": "Hi,\n\n> On Mon, Support wrote:\n> Thanks for reaching out, can you share more details?\n\nSure. My card statement shows the annual plan charged twice on 12 March. Please refund the duplicate.\n\nBest regards,\nSam Lee\nHead of Ops, Lee & Co\nSent from my phone",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr6",
+  "decision": "route",
+  "expect": "technical",
+  "allow_abstain": false,
+  "why": "technical with billing words",
+  "state": {
+   "subject": "API 500s",
+   "body": "Our integration calls the export endpoint and gets HTTP 500 errors since yesterday; CSV exports from the dashboard also hang at 0%. We're on the Enterprise plan if that matters for billing priority.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr7",
+  "decision": "route",
+  "expect": "shipping",
+  "allow_abstain": false,
+  "why": "wrong contents, refund mentioned",
+  "state": {
+   "subject": "wrong item",
+   "body": "I ordered the blue large and received a red small. The packaging was also crushed. I'd like the right item sent, or a refund if that is easier.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr8",
+  "decision": "route",
+  "expect": "account",
+  "allow_abstain": false,
+  "why": "mixed language + emoji",
+  "state": {
+   "subject": "no puedo entrar",
+   "body": "Hola \ud83d\ude29 no puedo iniciar sesi\u00f3n, the password reset email never arrives, I checked spam twice",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr9",
+  "decision": "route",
+  "expect": "account",
+  "allow_abstain": false,
+  "why": "long, core issue 2FA sign-in",
+  "state": {
+   "subject": "2FA",
+   "body": "Hello. Long story: we onboarded three new colleagues last week, set up the shared workspace, imported our old projects, and everything was fine. Since Tuesday, though, none of us receive the two-factor codes by SMS, so nobody can sign in. We tried different phones and networks. Could you look into this?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cr10",
+  "decision": "route",
+  "expect": "general",
+  "allow_abstain": true,
+  "why": "general product question",
+  "state": {
+   "subject": "question",
+   "body": "hi, quick question, do you have any plans for a desktop app for Linux at some point?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca1",
+  "decision": "approve",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "pro, well under cap, polite, no red flags",
+  "state": {
+   "subject": "refund request",
+   "body": "Hello, I was charged $45 for the add-on last week but we never activated it, our team uses a different tool. Could you refund it? Thanks so much for your help, we've been happy customers for two years.",
+   "customer_tier": "pro",
+   "amount": 45.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca2",
+  "decision": "approve",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "far over enterprise cap",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund the annual renewal of $1,200, we decided not to continue.",
+   "customer_tier": "enterprise",
+   "amount": 1200.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca3",
+  "decision": "approve",
+  "expect": false,
+  "allow_abstain": true,
+  "why": "right at the free cap: uncertain",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund the $24 charge, I bought the wrong plan by mistake.",
+   "customer_tier": "free",
+   "amount": 24.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca4",
+  "decision": "approve",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "repeat request",
+  "state": {
+   "subject": "refund request",
+   "body": "This is the third time I'm writing about this. I raised something similar last month and it still isn't fixed, refund the $60 please.",
+   "customer_tier": "pro",
+   "amount": 60.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca5",
+  "decision": "approve",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "chargeback threat",
+  "state": {
+   "subject": "refund request",
+   "body": "Refund the $300 now or our finance team will initiate a chargeback with the card issuer.",
+   "customer_tier": "enterprise",
+   "amount": 300.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca6",
+  "decision": "approve",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "tiny amount, free tier",
+  "state": {
+   "subject": "refund request",
+   "body": "I accidentally bought a $5 sticker pack twice, could you refund one?",
+   "customer_tier": "free",
+   "amount": 5.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "ca7",
+  "decision": "approve",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "new account phrase",
+  "state": {
+   "subject": "refund request",
+   "body": "Hi! I only signed up recently and was charged $95 for a plan I didn't choose, please refund.",
+   "customer_tier": "pro",
+   "amount": 95.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "cg1",
+  "decision": "grounded",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "multi-claim, all supported",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Thanks for your patience. Once approved (usually within 48 hours), your refund goes back to the original payment method within 5 business days. Since the item arrived damaged, the shipping fee is refunded too.",
+   "kb_article": "Refunds are issued to the original payment method within five business days of approval. Store credit is not offered. Shipping fees are refunded only if the item arrived damaged. Approval usually takes up to 48 hours."
+  }
+ },
+ {
+  "id": "cg2",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "multi-claim, one number wrong",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Thanks for your patience. Once approved (usually within 48 hours), your refund goes back to the original payment method within 10 business days. Since the item arrived damaged, the shipping fee is refunded too.",
+   "kb_article": "Refunds are issued to the original payment method within five business days of approval. Store credit is not offered. Shipping fees are refunded only if the item arrived damaged. Approval usually takes up to 48 hours."
+  }
+ },
+ {
+  "id": "cg3",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "extra unsupported promise",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Your refund goes back to the original payment method within 5 business days, and we'll add a 20% discount code for your next order.",
+   "kb_article": "Refunds are issued to the original payment method within five business days of approval. Store credit is not offered. Shipping fees are refunded only if the item arrived damaged. Approval usually takes up to 48 hours."
+  }
+ },
+ {
+  "id": "cg4",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "store credit contradicts the article",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "You can choose a refund to your original card or store credit, whichever you prefer.",
+   "kb_article": "Refunds are issued to the original payment method within five business days of approval. Store credit is not offered. Shipping fees are refunded only if the item arrived damaged. Approval usually takes up to 48 hours."
+  }
+ },
+ {
+  "id": "cg5",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "drops the 'only if damaged' condition",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Shipping fees are refunded in every case.",
+   "kb_article": "Refunds are issued to the original payment method within five business days of approval. Store credit is not offered. Shipping fees are refunded only if the item arrived damaged. Approval usually takes up to 48 hours."
+  }
+ },
+ {
+  "id": "cg6",
+  "decision": "grounded",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "long KB, paraphrase, a week = 7 days",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "As an administrator you can export your data; the CSV link works for a week, and big exports may take up to an hour.",
+   "kb_article": "Exports are available to administrators only. Exports are delivered as CSV files. Each export link stays valid for 7 days. Large exports can take up to an hour to prepare. Up to 3 exports can run at the same time. Exports older than 30 days are deleted."
+  }
+ },
+ {
+  "id": "cg7",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "audience broadened without 'all'",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Anyone on your team can export the data as a CSV file.",
+   "kb_article": "Exports are available to administrators only. Exports are delivered as CSV files. Each export link stays valid for 7 days. Large exports can take up to an hour to prepare. Up to 3 exports can run at the same time. Exports older than 30 days are deleted."
+  }
+ },
+ {
+  "id": "cg8",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "one of two numbers wrong",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "You can run up to 5 exports at once, and each link is valid for 7 days.",
+   "kb_article": "Exports are available to administrators only. Exports are delivered as CSV files. Each export link stays valid for 7 days. Large exports can take up to an hour to prepare. Up to 3 exports can run at the same time. Exports older than 30 days are deleted."
+  }
+ },
+ {
+  "id": "cg9",
+  "decision": "grounded",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "range written '3 to 5' vs '3-5'",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Domestic delivery takes 3-5 business days, or next business day with express.",
+   "kb_article": "Delivery takes 3 to 5 business days within the country. Express delivery arrives the next business day. International orders take 10 to 15 business days."
+  }
+ },
+ {
+  "id": "cg10",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "wrong range for international",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "International orders arrive within 5 business days.",
+   "kb_article": "Delivery takes 3 to 5 business days within the country. Express delivery arrives the next business day. International orders take 10 to 15 business days."
+  }
+ },
+ {
+  "id": "cg11",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "percentage changed",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Opened items carry a 10% restocking fee.",
+   "kb_article": "A 15% restocking fee applies to opened items. Unopened items can be returned free of charge within 30 days."
+  }
+ },
+ {
+  "id": "cg12",
+  "decision": "grounded",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "greeting + order id + sign-off",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Hi Dana, thanks for reaching out about order #77120. Unopened items can be returned free within 30 days. Kind regards, Alex",
+   "kb_article": "A 15% restocking fee applies to opened items. Unopened items can be returned free of charge within 30 days."
+  }
+ },
+ {
+  "id": "cg13",
+  "decision": "grounded",
+  "expect": true,
+  "allow_abstain": false,
+  "why": "24 hours = one day, half an hour = 30 minutes",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Your reset link is valid for one day, and after 5 failed attempts you'll be locked out for half an hour.",
+   "kb_article": "Password reset links expire after 24 hours. After five failed sign-in attempts the account is locked for 30 minutes."
+  }
+ },
+ {
+  "id": "cg14",
+  "decision": "grounded",
+  "expect": false,
+  "allow_abstain": false,
+  "why": "duration changed across units",
+  "state": {
+   "subject": "question",
+   "body": "see the draft",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Your reset link is valid for one week.",
+   "kb_article": "Password reset links expire after 24 hours. After five failed sign-in attempts the account is locked for 30 minutes."
+  }
+ }
+]

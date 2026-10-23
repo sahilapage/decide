@@ -162,6 +162,10 @@ def ticket_numbers(state: Dict[str, Any]) -> set:
 
 
 def fact_supported(fact, kb_facts) -> bool:
+    # Same number, same unit (one typo allowed). Matching the same duration across
+    # units ("1 day" vs "24 hours") was tried and rejected: the check is not
+    # claim-aware, so on train+dev it un-flagged 13 unsupported drafts whose
+    # changed number happened to equal another claim in another unit.
     num, unit = fact
     return any(n == num and _unit_match(unit, u) for n, u in kb_facts)
 
