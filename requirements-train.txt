@@ -1,0 +1,8 @@
+# Training / export only (GPU). Serving needs requirements.txt alone.
+-r requirements.txt
+torch>=2.4
+transformers>=4.48
+onnx>=1.16
+onnxscript>=0.1
+sentencepiece>=0.2
+protobuf>=4.25
