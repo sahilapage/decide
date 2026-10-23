@@ -30,7 +30,7 @@ correctly refuses to answer, and explain one trade-off.
 * **Case 2:** "Can someone help with my account please" gives a near-flat queue distribution (top probability about 0.34), and the model abstains.
 * **Case 4:** the same refund on the Free tier at $8, $22 and $60:
   * $8 is approved (p 0.84).
-  * $22 abstains: p 0.80 is close to the 0.75 break-even of the 3:1 cost.
+  * $22 abstains: p 0.61 is below the 0.75 break-even of the 3:1 cost, and the model is unsure, so a human decides.
   * $60 is held (p ≈ 0).
 
 > "The 3:1 cost means we approve only when p > 0.75, because 3·(1−p) < p. Near the cap we hand the case to a human."
