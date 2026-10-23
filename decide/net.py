@@ -18,13 +18,14 @@ import torch
 import torch.nn as nn
 from transformers import AutoConfig, AutoModel
 
-from decide.textfmt import APPROVE_DIM, TAB_DIM
+from decide.textfmt import APPROVE_DIM, tab_dim
 
 
 class DecideNet(nn.Module):
     def __init__(self, encoder_name_or_path: str, dropout: float = 0.1, from_config: bool = False,
                  pool: str = "mean"):
         super().__init__()
+        TAB_DIM = tab_dim()  # depends on the tab layout version set before construction
         if from_config:
             cfg = AutoConfig.from_pretrained(encoder_name_or_path)
             self.encoder = AutoModel.from_config(cfg)

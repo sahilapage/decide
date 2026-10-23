@@ -10,7 +10,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PY=${PYTHON:-python3}
 if [ ! -x .venv/bin/python ]; then
-  "$PY" -m venv .venv
+  # stock Debian/Ubuntu may lack python3-venv (ensurepip); fall back to virtualenv
+  if ! "$PY" -m venv .venv 2>/dev/null; then
+    rm -rf .venv
+    echo "start.sh: python3 -m venv unavailable (apt install python3-venv); trying virtualenv"
+    "$PY" -m pip install -q --user virtualenv 2>/dev/null || "$PY" -m pip install -q --user --break-system-packages virtualenv
+    "$PY" -m virtualenv -q .venv
+  fi
 fi
 if .venv/bin/python -c "import fastapi, uvicorn, numpy, onnxruntime, tokenizers, uvloop, httptools" 2>/dev/null; then
   echo "start.sh: serving packages already installed"

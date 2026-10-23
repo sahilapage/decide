@@ -13,7 +13,9 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from decide.textfmt import format_input, set_prompt_style, tabular
+MAX_FIELD_CHARS = 4000
+
+from decide.textfmt import format_input, set_prompt_style, set_tab_version, tabular
 
 
 class StudentRuntime:
@@ -21,6 +23,7 @@ class StudentRuntime:
         meta = json.load(open(os.path.join(folder, "meta.json")))
         self.use_tt = meta["use_token_type_ids"]
         set_prompt_style(meta.get("prompt_style", "long"))
+        set_tab_version(meta.get("tab_version", 1))
         self.tok = Tokenizer.from_file(os.path.join(folder, "tokenizer.json"))
         self.tok.no_padding()
         self.tok.enable_truncation(max_length=int(meta["max_len"]), strategy="longest_first")
@@ -56,6 +59,10 @@ class StudentRuntime:
         return feed
 
     def logits(self, decision: str, state: Dict[str, Any]):
+        # Clip very long fields before tokenising: pair truncation is quadratic in
+        # length, so a pasted full article could otherwise cost >100 ms. 4,000
+        # characters is ~8x the longest field in train/dev (482).
+        state = {k: (v[:MAX_FIELD_CHARS] if isinstance(v, str) else v) for k, v in (state or {}).items()}
         r, a, g = self.sess.run(self.out_names, self.encode(decision, state))
         if decision == "route":
             return r[0].astype(np.float64)

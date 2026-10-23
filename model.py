@@ -70,6 +70,9 @@ class DecisionModel:
     # -- approval -----------------------------------------------------------
     def approve(self, state: Dict[str, Any]) -> Tuple[bool, float, bool]:
         value, p, abstain = self.policy.approve(self._logit("approve", state))
+        if not str(state.get("subject") or "").strip() and not str(state.get("body") or "").strip():
+            # nothing to read about the request: never auto-approve blind
+            abstain = True
         return bool(value), p, bool(abstain)
 
     # -- grounding ----------------------------------------------------------
