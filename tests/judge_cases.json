@@ -1,0 +1,366 @@
+[
+ {
+  "id": "g1",
+  "decision": "grounded",
+  "expect": true,
+  "why": "paraphrase, digit vs word",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Refunds are issued within 5 business days.",
+   "kb_article": "Refunds are issued within five business days of approval."
+  }
+ },
+ {
+  "id": "g2",
+  "decision": "grounded",
+  "expect": true,
+  "why": "courtesy opener",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Thanks for getting in touch. Refunds are issued within 5 business days.",
+   "kb_article": "Refunds are issued within five business days of approval."
+  }
+ },
+ {
+  "id": "g3",
+  "decision": "grounded",
+  "expect": false,
+  "why": "number changed",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Refunds are issued within 10 business days.",
+   "kb_article": "Refunds are issued within five business days of approval."
+  }
+ },
+ {
+  "id": "g4",
+  "decision": "grounded",
+  "expect": true,
+  "why": "paraphrase",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "You can return any item within 30 days for a full refund.",
+   "kb_article": "Items can be returned within 30 days of delivery for a full refund."
+  }
+ },
+ {
+  "id": "g5",
+  "decision": "grounded",
+  "expect": false,
+  "why": "number changed",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "You can return any item within 60 days for a full refund.",
+   "kb_article": "Items can be returned within 30 days of delivery for a full refund."
+  }
+ },
+ {
+  "id": "g6",
+  "decision": "grounded",
+  "expect": false,
+  "why": "audience broadened",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "All users can export their data as CSV.",
+   "kb_article": "Only administrators can export data. Exports are delivered as CSV files."
+  }
+ },
+ {
+  "id": "g7",
+  "decision": "grounded",
+  "expect": true,
+  "why": "exact support",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Administrators can export data as CSV files.",
+   "kb_article": "Only administrators can export data. Exports are delivered as CSV files."
+  }
+ },
+ {
+  "id": "g8",
+  "decision": "grounded",
+  "expect": false,
+  "why": "unsupported claim",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Your plan includes 24/7 phone support.",
+   "kb_article": "Enterprise plans include priority email support during business hours."
+  }
+ },
+ {
+  "id": "g9",
+  "decision": "grounded",
+  "expect": true,
+  "why": "ticket ID in draft",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "I've looked into order #48213: we ship within 2 business days.",
+   "kb_article": "Orders ship within two business days. Tracking is emailed once the parcel leaves our warehouse."
+  }
+ },
+ {
+  "id": "g10",
+  "decision": "grounded",
+  "expect": true,
+  "why": "unit conversion",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Password reset links expire after an hour.",
+   "kb_article": "Password reset links are valid for 60 minutes. You can request a new link at any time."
+  }
+ },
+ {
+  "id": "g11",
+  "decision": "grounded",
+  "expect": false,
+  "why": "unit mismatch",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Password reset links expire after a day.",
+   "kb_article": "Password reset links are valid for 60 minutes. You can request a new link at any time."
+  }
+ },
+ {
+  "id": "g12",
+  "decision": "grounded",
+  "expect": false,
+  "why": "scope swap",
+  "state": {
+   "subject": "question",
+   "body": "see below",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "Annual plans can be cancelled any time with a full refund.",
+   "kb_article": "Monthly plans can be cancelled at any time. Annual plans are non-refundable after 14 days."
+  }
+ },
+ {
+  "id": "r1",
+  "decision": "route",
+  "expect": "billing",
+  "why": "double charge",
+  "state": {
+   "subject": "Charged twice",
+   "body": "I was billed two times for my subscription this month, please refund one.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r2",
+  "decision": "route",
+  "expect": "technical",
+  "why": "bug",
+  "state": {
+   "subject": "App crashes",
+   "body": "The app crashes every time I open the settings page on Android.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r3",
+  "decision": "route",
+  "expect": "account",
+  "why": "login/reset",
+  "state": {
+   "subject": "Can't log in",
+   "body": "I forgot my password and the reset email never arrives.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r4",
+  "decision": "route",
+  "expect": "shipping",
+  "why": "delivery",
+  "state": {
+   "subject": "Where is my parcel",
+   "body": "My package was supposed to arrive last week and tracking hasn't moved.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r5",
+  "decision": "route",
+  "expect": "general",
+  "why": "general enquiry",
+  "state": {
+   "subject": "Question",
+   "body": "Do you have an office in Berlin?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r6",
+  "decision": "route",
+  "expect": "billing",
+  "why": "invoice",
+  "state": {
+   "subject": "Invoice",
+   "body": "Can you send me a VAT invoice for my last payment?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r7",
+  "decision": "route",
+  "expect": "account",
+  "why": "profile",
+  "state": {
+   "subject": "Change email",
+   "body": "How do I change the email address on my profile?",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "r8",
+  "decision": "route",
+  "expect": "shipping",
+  "why": "damaged delivery",
+  "state": {
+   "subject": "Damaged item",
+   "body": "The box arrived crushed and the item inside is broken.",
+   "customer_tier": "pro",
+   "amount": 0.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a1",
+  "decision": "approve",
+  "expect": true,
+  "why": "small, well under pro cap",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund my last charge, I didn't use the service this month.",
+   "customer_tier": "pro",
+   "amount": 20.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a2",
+  "decision": "approve",
+  "expect": false,
+  "why": "far over free cap",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund my last charge, I didn't use the service this month.",
+   "customer_tier": "free",
+   "amount": 400.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a3",
+  "decision": "approve",
+  "expect": false,
+  "why": "over enterprise cap",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund the annual charge.",
+   "customer_tier": "enterprise",
+   "amount": 900.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a4",
+  "decision": "approve",
+  "expect": false,
+  "why": "chargeback history phrase",
+  "state": {
+   "subject": "refund request",
+   "body": "I disputed a charge with my bank previously, but please refund this one.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a5",
+  "decision": "approve",
+  "expect": false,
+  "why": "new-account phrase",
+  "state": {
+   "subject": "refund request",
+   "body": "I only signed up recently, please refund my first charge.",
+   "customer_tier": "pro",
+   "amount": 30.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ },
+ {
+  "id": "a6",
+  "decision": "approve",
+  "expect": true,
+  "why": "well under enterprise cap",
+  "state": {
+   "subject": "refund request",
+   "body": "Please refund the add-on we did not use.",
+   "customer_tier": "enterprise",
+   "amount": 120.0,
+   "draft_reply": "",
+   "kb_article": ""
+  }
+ }
+]

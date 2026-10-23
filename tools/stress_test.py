@@ -17,6 +17,7 @@ Label-preserving variants (should score ~ like clean dev):
   kb_distractor  one sentence from an unrelated KB article appended
   num_words      digits <-> number words swapped in draft and kb
   draft_ticket_ref  draft opens by quoting the order number / charged amount (not a policy claim)
+  kb_single      one-sentence KB article (closest sentence to the draft); correct drafts cut to one sentence
   all_mixed      a random 3 of the above per ticket
 Label-flipping variant (tests sensitivity, labels updated):
   num_flip       for grounded=True drafts, one number shared with the KB is changed -> grounded=False
@@ -133,6 +134,22 @@ def make_variant(name, recs, rng):
             if float(s.get("amount") or 0) > 0:
                 ref = "I've looked into the $%.2f charge on order #%d." % (float(s["amount"]), rng.randint(10000, 99999))
             s["draft_reply"] = ref + " " + s["draft_reply"]
+        elif name == "kb_single":
+            # short article, as a person typing a quick example would write: a
+            # random draft sentence (correct drafts only) and only the KB
+            # sentences it leans on. Close to decide/augment.py's kb_trim (in-family).
+            cw = lambda t: set(re.findall(r"[a-z]{4,}", t.lower()))
+            ds, ks = sents(s["draft_reply"]), sents(s["kb_article"])
+            if r["labels"]["grounded"] and len(ds) > 1:
+                s["draft_reply"] = rng.choice([x for x in ds if len(cw(x)) >= 3] or ds)
+            if ks:
+                d = cw(s["draft_reply"])
+                best = max(ks, key=lambda x: len(d & cw(x)))
+                if r["labels"]["grounded"]:
+                    # keep every sentence the draft leans on, so the label stays true
+                    s["kb_article"] = " ".join(x for x in ks if len(d & cw(x)) >= 2) or best
+                else:
+                    s["kb_article"] = best
         elif name == "num_flip":
             if r["labels"]["grounded"]:
                 kbn = set(re.findall(r"\b\d+\b", s["kb_article"]))
@@ -148,7 +165,7 @@ def make_variant(name, recs, rng):
 
 
 LABEL_PRESERVING = ["typos", "lower_nopunct", "synonyms", "body_shuffle", "amount_format",
-                    "kb_shuffle", "draft_shuffle", "kb_distractor", "num_words", "draft_ticket_ref", "all_mixed"]
+                    "kb_shuffle", "draft_shuffle", "kb_distractor", "num_words", "draft_ticket_ref", "kb_single", "all_mixed"]
 
 
 def run(model, recs):

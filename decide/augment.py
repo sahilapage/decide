@@ -8,7 +8,8 @@ gets one unrelated sentence, or has typos. Each augmented copy of a training
 ticket applies 1-3 of the families below; labels are unchanged.
 
 Families used in training: typo, case, kb_shuffle, kb_distractor, courtesy
-(no-claim opener/closer sentences around the draft).
+(no-claim opener/closer sentences around the draft), kb_trim (KB sentences the
+draft does not use are dropped, so one-sentence articles look familiar).
 Deliberately NOT used, so the stress test can measure generalisation to unseen
 shifts: number words, punctuation removal, synonyms, body/draft reordering,
 amount formatting.
@@ -24,7 +25,8 @@ from decide.textfmt import fact_supported, number_facts
 _SENT = re.compile(r"(?<=[.!?])\s+")
 _LETTERS = "abcdefghijklmnopqrstuvwxyz"
 FIELDS = ("subject", "body", "draft_reply", "kb_article")
-FAMILIES = ["typo", "case", "kb_shuffle", "kb_distractor", "courtesy"]
+FAMILIES = ["typo", "case", "kb_shuffle", "kb_distractor", "courtesy", "kb_trim"]
+_CONTENT = re.compile(r"[a-z]{4,}")
 
 
 def _sents(t):
@@ -80,6 +82,26 @@ def courtesy(draft, rng):
     return draft
 
 
+def kb_trim(draft, kb, grounded, rng):
+    """Drop KB sentences the draft does not lean on (short articles exist in the wild).
+    Correct drafts keep every sentence that shares 2+ content words with them;
+    an unsupported draft stays unsupported whatever is removed."""
+    ss = _sents(kb)
+    if len(ss) < 2:
+        return kb
+    dw = set(_CONTENT.findall(normalize(draft).lower()))
+    keep = []
+    for x in ss:
+        overlap = len(dw & set(_CONTENT.findall(normalize(x).lower())))
+        if overlap >= 2 or (not grounded and rng.random() < 0.5):
+            keep.append(x)
+    best = max(ss, key=lambda x: len(dw & set(_CONTENT.findall(normalize(x).lower()))))
+    if not keep or (not grounded and rng.random() < 0.3):
+        # unsupported drafts get short articles too, so length is no shortcut
+        keep = [best]
+    return " ".join(keep)
+
+
 def augment_row(row, rng, kb_pool):
     r = json.loads(json.dumps(row))
     s = r["state"]
@@ -94,6 +116,14 @@ def augment_row(row, rng, kb_pool):
                 s[k] = case(str(s.get(k) or ""), rng)
         elif f == "courtesy":
             s["draft_reply"] = courtesy(str(s.get("draft_reply") or ""), rng)
+        elif f == "kb_trim":
+            g = bool(r["labels"]["grounded"])
+            ds = _sents(s.get("draft_reply"))
+            if g and len(ds) > 1 and rng.random() < 0.5:
+                # a subset of supported claims is still supported (never done for
+                # unsupported drafts: the dropped sentence could be the bad claim)
+                s["draft_reply"] = max(ds, key=len)
+            s["kb_article"] = kb_trim(str(s.get("draft_reply") or ""), str(s.get("kb_article") or ""), g, rng)
         elif f == "kb_shuffle":
             ss = _sents(s.get("kb_article"))
             rng.shuffle(ss)

@@ -1,6 +1,8 @@
 # context.md — everything done so far on "Decide"
 
 > New session? Start with `HANDOVER.md` (current state, machines, next steps).
+>
+> **Update (2026-10-24, later):** the shipped model is now **v6t2 seed 3**. It scores 84.98 on selfcheck from a fresh clone (cross-fitted 84.1) and is robust to rewritten tickets (`docs/robustness.md`). Sections 1–15 below describe the earlier v5 model, and their headline numbers (85.22 / 84.7) are historical.
 
 A running log of the hackathon work: what we picked, what we built, what we
 tried, what worked, what failed, and where everything lives. Written so a

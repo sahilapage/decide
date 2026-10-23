@@ -8,6 +8,7 @@ Three-minute live demo against the running service.
 2. A case where it correctly refuses to answer (vague ticket -> abstain).
 3. Grounding catching a single wrong fact.
 4. Approval near a tier's amount cap, where the 3:1 cost rule holds back.
+5. A hand-typed, off-template ticket (what a judge might type) still works.
 """
 
 import argparse
@@ -40,6 +41,18 @@ CASES = [
         "kb_article": "monthly subscribers may cancel any time up to two weeks ahead of renewal. Service runs until the last day of the month with no cancellation fee.",
     }, ["grounded"]),
     ("4. Approval: same refund, three amounts on the Free tier", None, ["approve"]),
+    ("5. Off-template, hand-typed: short article, courtesy opener, order number in the draft", {
+        "subject": "refund status", "body": "Where is my refund for order 48213?", "customer_tier": "pro",
+        "amount": 45.5,
+        "draft_reply": "Thanks for getting in touch. I've checked order #48213: refunds are issued within 5 business days.",
+        "kb_article": "Refunds are issued within five business days of approval.",
+    }, ["grounded"]),
+    ("5b. Same, but the draft promises 10 business days", {
+        "subject": "refund status", "body": "Where is my refund for order 48213?", "customer_tier": "pro",
+        "amount": 45.5,
+        "draft_reply": "Thanks for getting in touch. I've checked order #48213: refunds are issued within 10 business days.",
+        "kb_article": "Refunds are issued within five business days of approval.",
+    }, ["grounded"]),
 ]
 
 

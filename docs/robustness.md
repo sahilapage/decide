@@ -90,6 +90,28 @@ Columns are seed 0, except v6g2, which is seed 3. Seed 0 of v6g2 dropped to
 Raw files are in `docs/stress/`. Re-print the table with
 `python tools/compare_stress.py docs/stress/*.json`.
 
+### Round 2: one-sentence articles and new topics (v6t2, v6L2)
+
+Hand-written, judge-style tickets (`tests/judge_cases.json`, 26 cases) exposed one more weakness.
+
+**The weakness.** Every training KB article has 3–4 sentences. When a judge types a one-sentence article, the model doubts correct drafts: a paraphrase got p = 0.02–0.11.
+
+**The fix.** The `kb_trim` family drops KB sentences the draft does not use. It is applied to correct and incorrect drafts alike, so article length gives no hint about the label. For correct drafts it may also cut the draft to one sentence, since a subset of supported claims is still supported.
+
+**A second initialisation.** We also tried starting from `KRLabsOrg/tinylettuce-ettin-17m-en`: the same Ettin-17M weights, already fine-tuned for RAG hallucination detection (MIT licence, published Aug 2025).
+
+| | v6c2 s0 (round 1) | v6t2 s0 | **v6t2 s3 (shipped)** | v6L2 s0 (TinyLettuce init) | v6L2 s3 |
+|---|---|---|---|---|---|
+| cross-fitted clean dev | 83.8 | 83.0 | **84.1** | 84.3 | 83.6 |
+| draft_ticket_ref | 79.7 | 80.3 | **84.6** | 80.2 | 83.3 |
+| kb_single (one-sentence KB) | 70.6 | 75.6 | **78.1** | 74.6 | 75.9 |
+| mean of variants never seen in training | 83.0 | 82.5 | **83.8** | – | – |
+| judge cases | 21 / 26 | 25 / 26 | **25 / 26** | 25 / 26 | 24 / 26 |
+
+The TinyLettuce start was level on clean data and no better on the shifts, so we kept the plain Ettin initialisation.
+
+Fresh-clone `selfcheck.py` for v6t2 s3: **84.98**, all gates PASS, p95 6.3 ms.
+
 ### Cost on clean data
 
 Each run's policy is cross-fitted on dev, with 10 halves per run:
