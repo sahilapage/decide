@@ -1,11 +1,16 @@
 """
 Train the gate-1 baseline: shared sparse backbone + three heads.
 
-  python train_baseline.py
+  python training/train_baseline.py
 
 5-fold out-of-fold logits on train fit the calibration and abstain policy;
 the final model is refit on all of train. Dev is only used to report.
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import json
 import pickle

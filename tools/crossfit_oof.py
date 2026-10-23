@@ -16,6 +16,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from decide.policy import fit_policy  # noqa: E402
 from decide.scoring import score  # noqa: E402
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "training"))
 from eval_runs import QUEUES, collect, load  # noqa: E402
 
 

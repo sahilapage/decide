@@ -3,8 +3,13 @@ Uniform model soup: average the weights of several full runs fine-tuned from
 the same pretrained encoder (different seeds), then predict dev with the
 averaged network. Same size and latency as one model.
 
-  python soup.py runs/soup_e32 runs/e32s_full runs/e32s_s1 runs/e32s_s2 runs/e32s_s3
+  python training/soup.py runs/soup_e32 runs/e32s_full runs/e32s_s1 runs/e32s_s2 runs/e32s_s3
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import json
 import os
