@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# The dataset is handed to you; do not commit it.
+data/*.jsonl
+
+# NOTE: artifacts/ is deliberately NOT ignored. The judges have to be able to
+# start your service from a clean clone, so commit your weights if they fit
+# (the limit is 500MB total). If they are too large for your git host, say in
+# the README exactly how to fetch or rebuild them - a service that cannot be
+# started cannot be scored.
+
+.DS_Store
+hf/
+runs/
+*.log
