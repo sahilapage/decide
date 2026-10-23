@@ -86,10 +86,79 @@ def _duration_sub(m: re.Match) -> str:
     return "%d %s" % (n * mult, name)
 
 
+def damerau1(a: str, b: str) -> bool:
+    """True if a and b differ by at most one edit (insert, delete, substitute or swap)."""
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    if la == lb:
+        diff = [i for i in range(la) if a[i] != b[i]]
+        if len(diff) == 1:
+            return True
+        return len(diff) == 2 and diff[1] == diff[0] + 1 and a[diff[0]] == b[diff[1]] and a[diff[1]] == b[diff[0]]
+    if la > lb:
+        a, b = b, a
+    i = 0
+    while i < len(a) and a[i] == b[i]:
+        i += 1
+    return a[i:] == b[i + 1:]
+
+
+# Long number and unit words get one-typo repair ("hudnred", "busniess",
+# "fuorteen"). Only words of 6+ letters: shorter ones collide with ordinary
+# words ("three"/"there", "hours"/"yours", "fifty"/"fifth").
+_REPAIR_VOCAB = ["hundred", "thousand", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+                 "seventeen", "eighteen", "nineteen", "twenty", "seventy", "ninety", "minutes", "minute",
+                 "months", "business", "working", "seconds", "fortnight", "quarter"]
+_REPAIR_SKIP = {"thirsty", "minuet", "mouths", "twelfth", "second", "minuted", "monthly", "worked", "worming"}
+_TOKEN = re.compile(r"[A-Za-z]{6,}")
+_SEEN = {}
+
+
+def _repair_word(m: re.Match) -> str:
+    w = m.group(0)
+    lw = w.lower()
+    if lw in _SEEN:
+        return _SEEN[lw] or w
+    fix = None
+    if lw not in _REPAIR_VOCAB and lw not in _REPAIR_SKIP:
+        for v in _REPAIR_VOCAB:
+            if abs(len(v) - len(lw)) <= 1 and damerau1(lw, v):
+                fix = v
+                break
+    if len(_SEEN) < 50000:
+        _SEEN[lw] = fix
+    return fix or w
+
+
+_UNIT_VOCAB = ["day", "days", "week", "weeks", "hour", "hours", "year", "years", "month", "months",
+               "minute", "minutes"]
+# a unit word right after a digit ("7 wek", "14 dasy") or, for 4+ letter units,
+# after "a"/"an" ("a wek"). Short units after "a" are left alone ("a way").
+_UNIT_CTX = re.compile(r"\b(\d+|an?)\s+([A-Za-z]{2,8})\b")
+
+
+def _repair_unit(m: re.Match) -> str:
+    lead, w = m.group(1), m.group(2)
+    lw = w.lower()
+    if lw in _UNIT_VOCAB:
+        return m.group(0)
+    for v in _UNIT_VOCAB:
+        if not lead[0].isdigit() and len(v) < 4:
+            continue
+        if min(len(v), len(lw)) >= 3 and damerau1(lw, v):
+            return "%s %s" % (lead, v)
+    return m.group(0)
+
+
 def normalize(text: str) -> str:
     if not text:
         return ""
-    t = _HUNDREDS.sub(_hundreds_sub, text)
+    t = _TOKEN.sub(_repair_word, text)
+    t = _UNIT_CTX.sub(_repair_unit, t)
+    t = _HUNDREDS.sub(_hundreds_sub, t)
     t = _HALF_HOUR.sub("30 minutes", t)
     t = _QUARTER_HOUR.sub("15 minutes", t)
     t = _NUM_WORD.sub(_num_sub, t)

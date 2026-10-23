@@ -94,6 +94,13 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
+    if args.augment > 0:
+        # augmented copies of the TRAINING rows only (fold validation stays clean)
+        from decide.augment import augment
+        tr_rows = list(tr_rows) + augment(tr_rows, args.augment, seed=args.seed)
+        if soft is not None:
+            soft = {k: np.concatenate([v] * (1 + args.augment)) for k, v in soft.items()}
+        print("  augmented train rows:", len(tr_rows), flush=True)
     feats, tabs = encode(tok, tr_rows, args.max_len)
     y_r = torch.tensor([QUEUES.index(r["labels"]["route"]) for r in tr_rows])
     y_a = torch.tensor([float(r["labels"]["approve"]) for r in tr_rows])
@@ -198,6 +205,8 @@ def main():
     ap.add_argument("--prompt", default="long", choices=["long", "short"])
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
+    ap.add_argument("--augment", type=int, default=0,
+                    help="label-preserving augmented copies per training row (decide/augment.py)")
     args = ap.parse_args()
     set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
