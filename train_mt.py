@@ -297,7 +297,8 @@ def main():
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     ap.add_argument("--tab_version", type=int, default=1,
-                    help="1 = original aux vector; 2 adds amount/cap ramps, amount==0 and phrase flags")
+                    help="1 = original aux vector; 2 adds amount/cap ramps, amount==0 and phrase flags; "
+                         "3 = 2 + wider scope / weekday checks in the grounded scope flag")
     ap.add_argument("--augment", type=int, default=0,
                     help="label-preserving augmented copies per training row (decide/augment.py)")
     ap.add_argument("--cons", type=float, default=0.0,

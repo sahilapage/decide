@@ -89,6 +89,41 @@ def scope_broadened(draft: str, kb: str) -> bool:
     return False
 
 
+_NOT_QUALIFIER = {"the", "a", "an", "our", "your", "their", "its", "of", "for", "to", "and", "or", "is", "are", "be",
+                  "on", "in", "at", "by", "with", "every", "each", "any", "after", "before", "from", "per", "this",
+                  "that", "these", "those", "all", "than", "until", "within", "into", "over", "under", "about", "via",
+                  "no", "not"}
+_WEEKEND = {"weekend", "weekends", "saturday", "saturdays", "sunday", "sundays"}
+_WEEKDAY = {"weekday", "weekdays", "monday", "tuesday", "wednesday", "thursday", "friday", "mondays", "fridays"}
+
+
+def scope_broadened_v2(draft: str, kb: str) -> bool:
+    """Draft says "all N" where the article only ever qualifies N ("premium N",
+    "paid N") and never says "all N". Generalises scope_broadened: on train+dev it
+    fires on 0 of 4,822 supported drafts and on 173 unsupported ones (old: 8)."""
+    dw = _WORD.findall(draft.lower())
+    kw = _WORD.findall(kb.lower())
+    kt = " ".join(kw)
+    for i in range(len(dw) - 1):
+        if dw[i] == "all":
+            n = dw[i + 1]
+            if n in _NOT_QUALIFIER or ("all " + n) in kt:
+                continue
+            for j in range(1, len(kw)):
+                if kw[j] == n and kw[j - 1] not in _NOT_QUALIFIER:
+                    return True
+    return False
+
+
+def days_conflict(draft: str, kb: str) -> bool:
+    """Draft promises weekend days the article's opening days exclude, or the reverse."""
+    dw, kw = set(_WORD.findall(draft.lower())), set(_WORD.findall(kb.lower()))
+    k_days = kw & (_WEEKEND | _WEEKDAY)
+    if not k_days:
+        return False
+    return bool((dw & _WEEKEND) and not (kw & _WEEKEND)) or bool((dw & _WEEKDAY) and not (kw & _WEEKDAY))
+
+
 def number_facts(text: str) -> set:
     return {(re.sub(r"\s+", "", m.group(1)), m.group(2).lower()) for m in _FACT.finditer(text)}
 
@@ -182,7 +217,12 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     v[APPROVE_DIM] = 1.0 if extra else 0.0
     v[APPROVE_DIM + 1] = min(len(extra), 3) / 3.0
     v[APPROVE_DIM + 2] = (1 - len(extra) / len(d)) if d else 1.0
-    v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
+    if _TAB["version"] >= 3:
+        # one "draft claims a wider / different scope than the article" flag
+        v[APPROVE_DIM + 3] = 1.0 if (scope_broadened(dn, kn) or scope_broadened_v2(dn, kn)
+                                     or days_conflict(dn, kn)) else 0.0
+    else:
+        v[APPROVE_DIM + 3] = 1.0 if scope_broadened(dn, kn) else 0.0
     if _TAB["version"] >= 2:
         o = TAB_DIM
         r = amt / CAPS[TIERS[ti]] if amt > 0 else 0.0
