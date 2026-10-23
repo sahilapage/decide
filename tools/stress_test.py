@@ -16,6 +16,7 @@ Label-preserving variants (should score ~ like clean dev):
   draft_shuffle  draft sentences in random order
   kb_distractor  one sentence from an unrelated KB article appended
   num_words      digits <-> number words swapped in draft and kb
+  draft_ticket_ref  draft opens by quoting the order number / charged amount (not a policy claim)
   all_mixed      a random 3 of the above per ticket
 Label-flipping variant (tests sensitivity, labels updated):
   num_flip       for grounded=True drafts, one number shared with the KB is changed -> grounded=False
@@ -126,6 +127,11 @@ def make_variant(name, recs, rng):
             for v in rng.sample(LABEL_PRESERVING[:-1], 3):
                 r = make_variant(v, [r], rng)[0]
                 s = r["state"]
+        elif name == "draft_ticket_ref":
+            ref = "I've noted this on order #%d." % rng.randint(10000, 99999)
+            if float(s.get("amount") or 0) > 0:
+                ref = "I've looked into the $%.2f charge on order #%d." % (float(s["amount"]), rng.randint(10000, 99999))
+            s["draft_reply"] = ref + " " + s["draft_reply"]
         elif name == "num_flip":
             if r["labels"]["grounded"]:
                 kbn = set(re.findall(r"\b\d+\b", s["kb_article"]))
@@ -141,7 +147,7 @@ def make_variant(name, recs, rng):
 
 
 LABEL_PRESERVING = ["typos", "lower_nopunct", "synonyms", "body_shuffle", "amount_format",
-                    "kb_shuffle", "draft_shuffle", "kb_distractor", "num_words", "all_mixed"]
+                    "kb_shuffle", "draft_shuffle", "kb_distractor", "num_words", "draft_ticket_ref", "all_mixed"]
 
 
 def run(model, recs):
@@ -163,11 +169,12 @@ def main():
     ap.add_argument("--n", type=int, default=0, help="subsample (0 = all)")
     ap.add_argument("--only", default="")
     ap.add_argument("--out", default="")
+    ap.add_argument("--artifacts", default="artifacts")
     args = ap.parse_args()
     recs = [json.loads(l) for l in open(args.data, encoding="utf-8") if l.strip()]
     if args.n:
         recs = random.Random(0).sample(recs, args.n)
-    model = DecisionModel()
+    model = DecisionModel(args.artifacts)
     names = ["clean"] + LABEL_PRESERVING + ["num_flip"]
     if args.only:
         names = ["clean"] + args.only.split(",")
