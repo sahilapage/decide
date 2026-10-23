@@ -1,5 +1,7 @@
 # context.md — everything done so far on "Decide"
 
+> New session? Start with `HANDOVER.md` (current state, machines, next steps).
+
 A running log of the hackathon work: what we picked, what we built, what we
 tried, what worked, what failed, and where everything lives. Written so a
 teammate (or a fresh Claude session) can pick up with no other context.
