@@ -15,7 +15,8 @@ mkdir -p docs/stress "$CACHE"
 # serving code must match on both sides
 scp -q decide/*.py "$HOST:$REMOTE/decide/"
 scp -q model.py "$HOST:$REMOTE/"
-scp -q tools/stress_test.py "$HOST:$REMOTE/tools/"
+scp -q tools/stress_test.py tools/judge_cases.py "$HOST:$REMOTE/tools/"
+ssh "$HOST" "mkdir -p $REMOTE/tests"; scp -q tests/judge_cases.json "$HOST:$REMOTE/tests/"
 for RUN in "$@"; do
   NAME=$(basename "$RUN" | sed 's/_e17//')
   echo "=== $NAME"
@@ -32,5 +33,6 @@ for RUN in "$@"; do
       && taskset -c $CPUS .venv/bin/python tools/stress_test.py --artifacts cand/$NAME --out docs/stress/$NAME.json 2>&1 \
       | grep -v -i warn | grep -E '^(clean|all_mixed|draft_ticket_ref|kb_single)'"
     scp -q "$HOST:$REMOTE/docs/stress/$NAME.json" docs/stress/
+    ssh "$HOST" "cd $REMOTE && taskset -c $CPUS .venv/bin/python tools/judge_cases.py --artifacts cand/$NAME 2>&1 | grep -E 'XX|as expected'"
   fi
 done
