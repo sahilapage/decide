@@ -72,7 +72,8 @@ def main():
         if os.path.exists(os.path.join(tok_dir, f)):
             shutil.copy(os.path.join(tok_dir, f), os.path.join(args.out, f))
     meta = {"max_len": args.max_len or run_args["max_len"], "use_token_type_ids": use_tt,
-            "encoder": run_args["model"], "inputs": names}
+            "encoder": run_args["model"], "inputs": names,
+            "prompt_style": run_args.get("prompt", "long")}
     json.dump(meta, open(os.path.join(args.out, "meta.json"), "w"), indent=2)
     if args.policy:
         shutil.copy(args.policy, os.path.join(args.out, "policy.json"))

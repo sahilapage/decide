@@ -24,7 +24,7 @@ from sklearn.model_selection import StratifiedKFold
 from transformers import AutoTokenizer, get_cosine_schedule_with_warmup
 
 from decide.net import DecideNet
-from decide.textfmt import DECISIONS, format_input, tabular
+from decide.textfmt import DECISIONS, format_input, set_prompt_style, tabular
 
 QUEUES = ["billing", "technical", "account", "shipping", "general"]
 
@@ -166,8 +166,10 @@ def main():
     ap.add_argument("--alpha", type=float, default=0.5)
     ap.add_argument("--tw", type=str, default="", help="task weights e.g. route=1,approve=1,grounded=1")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--prompt", default="long", choices=["long", "short"])
     ap.add_argument("--train_extra", type=str, default="", help="extra jsonl rows appended to train")
     args = ap.parse_args()
+    set_prompt_style(args.prompt)
     args.task_weight = {k: float(v) for k, v in (x.split("=") for x in args.tw.split(",") if x)}
     os.makedirs(args.out, exist_ok=True)
     json.dump(vars(args), open(os.path.join(args.out, "args.json"), "w"), indent=2)

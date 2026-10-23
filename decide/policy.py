@@ -84,8 +84,13 @@ class Policy:
     def approve(self, logit: float):
         p = float(sigmoid(self.cfg["a_appr"] * logit + self.cfg["b_appr"]))
         value = p > self.cfg["thr_appr"]
-        if self.cfg.get("appr_mode", "cost") == "conf":
+        mode = self.cfg.get("appr_mode", "cost")
+        if mode == "conf":
             return value, p, max(p, 1.0 - p) < self.cfg["tau_appr"]
+        if mode == "ratio":
+            # marginal effect of answering this case on 1 - cost/hold_cost
+            s = min(3.0 * (1.0 - p), p) - self.cfg["lam_appr"] * p
+            return value, p, s > self.cfg["tau_appr"]
         risk = min(3.0 * (1.0 - p), p)
         return value, p, risk > self.cfg["tau_appr"]
 
@@ -141,23 +146,65 @@ def fit_policy(route_logits, y_route, appr_logits, y_appr, gr_logits, y_gr,
     }
     pol = Policy(cfg)
     if records is not None:
-        from decide.scoring import score
-        # approve: compare an expected-cost abstain rule with a plain confidence
-        # rule, over abstain shares from 0 to (1 - coverage); keep the best q_appr.
-        risk = np.minimum(3 * (1 - pa), pa)
-        conf = np.maximum(pa, 1 - pa)
-        best = None
-        for mode in ("cost", "conf"):
-            for qq in np.linspace(0.0, 1 - coverage, 9):
-                c = dict(cfg, appr_mode=mode)
-                if mode == "cost":
-                    c["tau_appr"] = float(np.quantile(risk, 1 - qq)) if qq > 0 else 9.0
-                else:
-                    c["tau_appr"] = float(np.quantile(conf, qq)) if qq > 0 else -1.0
-                _, _, d = score(records, Policy(c).responses(route_logits, appr_logits, gr_logits))
-                if best is None or d["q_appr"] > best[0] + 1e-9:
-                    best = (d["q_appr"], mode, qq, c)
-        if verbose:
-            print("  approve abstain rule: %s, abstain share %.3f, q_appr %.4f" % (best[1], best[2], best[0]))
-        pol = Policy(best[3])
+        cfg = tune_abstention(cfg, records, route_logits, appr_logits, gr_logits, coverage, verbose)
+        pol = Policy(cfg)
     return pol
+
+
+def tune_abstention(cfg, records, route_logits, appr_logits, gr_logits,
+                    coverage=TARGET_COVERAGE, verbose=True, tol=0.002):
+    """
+    Pick each decision's abstain rule against the offline scorer.
+
+    Abstaining only changes that decision's quality term, and only helps while
+    coverage stays above the 80% target. For each decision we search abstain
+    shares in [0, 1 - coverage] and keep the SMALLEST share whose quality is
+    within `tol` of the best: no abstaining that buys nothing.
+    """
+    from decide.scoring import score
+
+    route_logits = np.asarray(route_logits, dtype=np.float64)
+    pr = softmax(route_logits / cfg["T_route"]).max(1)
+    pa = sigmoid(cfg["a_appr"] * np.asarray(appr_logits) + cfg["b_appr"])
+    pg = sigmoid(cfg["a_gr"] * np.asarray(gr_logits) + cfg["b_gr"])
+    shares = np.linspace(0.0, 1 - coverage, 13)
+    cfg = dict(cfg)
+
+    def pick(key, trials):
+        res = []
+        for share, c in trials:
+            _, _, d = score(records, Policy(c).responses(route_logits, appr_logits, gr_logits))
+            res.append((d[key], share, c))
+        top = max(r[0] for r in res)
+        ok = [r for r in res if r[0] >= top - tol]
+        return min(ok, key=lambda r: r[1])
+
+    # route: abstain on the lowest top-class probability
+    q_r, s_r, c_r = pick("q_route", [(s, dict(cfg, tau_route=float(np.quantile(pr, s)) if s > 0 else -1.0))
+                                     for s in shares])
+    cfg["tau_route"] = c_r["tau_route"]
+    # grounded: abstain on the least decisive probabilities
+    cg = np.maximum(pg, 1 - pg)
+    q_g, s_g, c_g = pick("q_gr", [(s, dict(cfg, tau_gr=float(np.quantile(cg, s)) if s > 0 else -1.0))
+                                  for s in shares])
+    cfg["tau_gr"] = c_g["tau_gr"]
+    # approve: expected-cost rule, confidence rule, or the ratio rule
+    risk = np.minimum(3 * (1 - pa), pa)
+    conf = np.maximum(pa, 1 - pa)
+    trials = []
+    for mode, lam in [("cost", 0.0), ("conf", 0.0)] + [("ratio", l) for l in np.linspace(0.0, 2.0, 21)]:
+        for s in shares:
+            c = dict(cfg, appr_mode=mode, lam_appr=float(lam))
+            if mode == "cost":
+                c["tau_appr"] = float(np.quantile(risk, 1 - s)) if s > 0 else 9.0
+            elif mode == "conf":
+                c["tau_appr"] = float(np.quantile(conf, s)) if s > 0 else -1.0
+            else:
+                c["tau_appr"] = float(np.quantile(risk - lam * pa, 1 - s)) if s > 0 else 9.0
+            trials.append((s, c))
+    q_a, s_a, c_a = pick("q_appr", trials)
+    cfg.update({k: c_a[k] for k in ("appr_mode", "lam_appr", "tau_appr")})
+    if verbose:
+        print("  abstain shares: route %.3f (q %.4f)  approve %.3f %s lam %.2f (q %.4f)  grounded %.3f (q %.4f)"
+              % (s_r, q_r, s_a, cfg["appr_mode"], cfg["lam_appr"], q_a, s_g, q_g))
+    return cfg

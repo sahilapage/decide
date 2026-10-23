@@ -13,13 +13,14 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-from decide.textfmt import format_input, tabular
+from decide.textfmt import format_input, set_prompt_style, tabular
 
 
 class StudentRuntime:
     def __init__(self, folder: str):
         meta = json.load(open(os.path.join(folder, "meta.json")))
         self.use_tt = meta["use_token_type_ids"]
+        set_prompt_style(meta.get("prompt_style", "long"))
         self.tok = Tokenizer.from_file(os.path.join(folder, "tokenizer.json"))
         self.tok.no_padding()
         self.tok.enable_truncation(max_length=int(meta["max_len"]), strategy="longest_first")

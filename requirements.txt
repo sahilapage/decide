@@ -1,7 +1,7 @@
 # Serving (CPU only). Bounded rather than hard-pinned so pip picks a wheel
 # that matches the judges' Python; the versions we ran are in the README.
 fastapi>=0.115,<1.0
-uvicorn>=0.32,<1.0
+uvicorn[standard]>=0.32,<1.0
 numpy>=1.26,<3.0
 onnxruntime>=1.20,<2.0
 tokenizers>=0.20,<1.0
