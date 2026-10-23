@@ -294,3 +294,56 @@ python pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
 * Give the judges the host:port where the service is running.
 * Optional: benchmark `DECIDE_SPIN=0` vs `1` for the 17M model on 2 physical
   cores before changing the default (the current default is unchanged).
+
+## 15. Arhan's side (optimisation, benchmarking, verification)
+
+Added by Arhan's Claude Code session. Sections 1–14 above are Sahil's log and
+stay the source of truth; this covers only what isn't there.
+
+* **Independent verification of the shipped 17M (main @ 717faed)** on a
+  second machine: Arhan's laptop (AMD Ryzen 7 7735HS, 8 cores / 16 threads, no
+  GPU, Pop!_OS, Python 3.12).
+
+  | Check | Result |
+  |---|---|
+  | Full dev `selfcheck.py` over HTTP | **85.22**, 4,500/4,500 valid, all gates PASS |
+  | p95, 4 physical cores (`taskset -c 0,2,4,6`) | **4.3 ms** |
+  | p95, 2 physical cores / 4 vCPU (`taskset -c 0-3`) | **6.3 ms** |
+
+  The p95/p50 ratio is about 1.3, so the 17M is steady even on the noisy
+  laptop, unlike the 32M.
+* **Second GPU box (Arhan's):** `sra@10.1.205.86`, an RTX 3060 12 GB shared lab
+  machine (password: ask Arhan; never commit it).
+  * Clone: `~/Arhan/decide`, data copied into `data/`.
+  * Env: `source ~/miniconda3/etc/profile.d/conda.sh && conda activate decide`
+    (Python 3.11, torch 2.14.1+cu130, transformers 5.20.2, onnxruntime 1.31).
+    Torch had to come from PyPI because `download.pytorch.org` reset the
+    connection.
+  * Ettin-17M trains in about 2 min per run (about 12 s/epoch).
+* **Laptop training env:** `decide/.venv` also has CPU torch 2.14.1 and
+  transformers 5.20.2, so `train_mt.py --device cpu` works there (slow, but no
+  GPU needed).
+* **Arhan's own 17M run** (long prompts, older policy code, offline dev 83.83)
+  was only a size comparison and is superseded by Sahil's v5 17M. It lives in
+  `runs/e17*` and `exports/e17` on both machines (gitignored, not used).
+* **Deep research report** (outside the repo):
+  `~/Final_Hackathon_PS_Decide/reports/Decide hackathon solution research.md`,
+  with source notes in `research_notes/`. Verdicts:
+  * Test-time training / adaptation: skip. There is no distribution shift, it
+    costs at least one backward pass per request, and entropy-minimising TTA
+    hurts calibration.
+  * RL: skip. With full labels a bandit reduces to cost-sensitive
+    classification, and the 3:1 cost has the closed-form threshold 0.75.
+  * The only cheap "test-time compute" idea worth trying is kNN agreement over
+    training embeddings as an extra confidence signal (not built).
+* **Demo notes:**
+  * A demo server started before `git pull` keeps serving the old model, so
+    restart it after pulling.
+  * Quote **84.7** (cross-fitted) as the expected score and 85.2 as in-sample.
+* **Extra gotchas:**
+  * `setsid cmd & echo $!` records setsid's PID, which exits immediately. Find a
+    server by its port instead: `ss -ltnp | grep :8000`.
+  * `/tmp` scratch files vanish on reboot, so keep anything worth having in the
+    repo.
+  * On SMT machines, check `lscpu -e=CPU,CORE` before trusting a "4-core"
+    `taskset`.
