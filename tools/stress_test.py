@@ -34,6 +34,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from decide.scoring import score  # noqa: E402
 from model import DecisionModel, QUEUES  # noqa: E402
+from decide.normalize import normalize  # noqa: E402
+from decide.textfmt import fact_supported, number_facts  # noqa: E402
 
 WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
          "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
@@ -98,9 +100,47 @@ def num_words(t, rng):
     return t
 
 
+def plain_sents(rows):
+    """Body sentences with no digits or money, safe to move between tickets."""
+    return [x for r in rows for x in sents(r["state"]["body"]) if not re.search(r"[\d$]", x) and len(x) > 15]
+
+
+def kb_filler(s, kbs, rng, k):
+    """k sentences from other KB articles that supply none of the draft's number facts."""
+    d_facts = number_facts(normalize(s["draft_reply"]))
+    out = []
+    for _ in range(40):
+        c = rng.choice(sents(rng.choice(kbs)) or [""])
+        if c and c not in out and not any(fact_supported(f, number_facts(normalize(c))) for f in d_facts):
+            out.append(c)
+        if len(out) == k:
+            break
+    return out
+
+
+def complex_pools(recs):
+    """Neutral body sentences grouped by (route, approve) label, and by route."""
+    by_label, by_route = {}, {}
+    for r in recs:
+        key = (r["labels"]["route"], r["labels"]["approve"])
+        by_label.setdefault(key, []).append(r)
+        by_route.setdefault(r["labels"]["route"], []).append(r)
+    return ({k: plain_sents(v) for k, v in by_label.items()},
+            {k: plain_sents(v) for k, v in by_route.items()})
+
+
+THREAD_HEAD = ["Hi team,", "Hello,", "Hi there,", "Good morning,"]
+THREAD_TAIL = ["Thanks in advance for looking into this.", "Looking forward to hearing back.",
+               "Best regards,\nAlex", "Thanks,\nSam\nSent from my phone"]
+THREAD_QUOTE = ["On Monday you wrote: 'Thanks for contacting support, we have received your request.'",
+                "> Your ticket has been received and a member of our team will reply shortly.",
+                "--- Original message --- Thank you for reaching out. Could you share more details?"]
+
+
 def make_variant(name, recs, rng):
     out = []
     kbs = [r["state"]["kb_article"] for r in recs]
+    same_label, same_route = complex_pools(recs) if name in COMPLEX else ({}, {})
     for r in recs:
         r = json.loads(json.dumps(r))
         s = r["state"]
@@ -150,6 +190,23 @@ def make_variant(name, recs, rng):
                     s["kb_article"] = " ".join(x for x in ks if len(d & cw(x)) >= 2) or best
                 else:
                     s["kb_article"] = best
+        elif name in COMPLEX:
+            parts = {"complex_all": ["long_body", "multi_issue", "long_kb", "thread"]}.get(name, [name])
+            if "long_body" in parts:
+                pool = same_label.get((r["labels"]["route"], r["labels"]["approve"])) or [""]
+                s["body"] = s["body"].rstrip() + " " + " ".join(rng.sample(pool, min(len(pool), rng.randint(2, 4))))
+            if "multi_issue" in parts:
+                other = rng.choice([q for q in same_route if q != r["labels"]["route"]])
+                s["body"] = (s["body"].rstrip() + " Separately, less urgent: "
+                             + rng.choice(same_route[other] or [""]))
+            if "long_kb" in parts:
+                ks = sents(s["kb_article"])
+                for c in kb_filler(s, kbs, rng, rng.randint(3, 5)):
+                    ks.insert(rng.randint(0, len(ks)), c)
+                s["kb_article"] = " ".join(ks)
+            if "thread" in parts:
+                s["body"] = "%s %s %s %s" % (rng.choice(THREAD_HEAD), s["body"].strip(),
+                                             rng.choice(THREAD_TAIL), rng.choice(THREAD_QUOTE))
         elif name == "num_flip":
             if r["labels"]["grounded"]:
                 kbn = set(re.findall(r"\b\d+\b", s["kb_article"]))
@@ -164,6 +221,8 @@ def make_variant(name, recs, rng):
     return out
 
 
+# "complex" judge-style shift: longer and multi-part tickets, long KB articles, email threads
+COMPLEX = ["long_body", "multi_issue", "long_kb", "thread", "complex_all"]
 LABEL_PRESERVING = ["typos", "lower_nopunct", "synonyms", "body_shuffle", "amount_format",
                     "kb_shuffle", "draft_shuffle", "kb_distractor", "num_words", "draft_ticket_ref", "kb_single", "all_mixed"]
 

@@ -16,6 +16,9 @@ head, not a new model.
 
 from typing import Any, Dict, Optional, Tuple
 
+import json
+import math
+import os
 import re
 
 import numpy as np
@@ -243,6 +246,49 @@ def tabular(state: Dict[str, Any]) -> np.ndarray:
     return v
 
 
+# Every train/dev KB article has 2-4 sentences. A longer one (a fuller article
+# than the model ever saw) buries the supporting sentence among unrelated ones
+# and the encoder calls correct drafts unsupported (stress variant long_kb:
+# grounded 1.00 -> 0.91). So for long articles only, the encoder reads the
+# sentences the draft leans on. The model already trains on trimmed articles
+# (augment kb_trim); the number/scope flags still use the full article.
+KB_MAX_SENTS = 4
+KB_MIN_SCORE = 4.0          # summed rarity of shared terms (one rare word ~ 4-6)
+_KB_SENT = re.compile(r"(?<=[.!?])\s+")
+_STOP = {"the", "and", "for", "are", "you", "our", "can", "any", "all", "that", "this", "with", "your",
+         "from", "have", "will", "when", "which", "their", "there", "they", "them", "then", "than",
+         "into", "been", "were", "what", "also", "only", "just", "more"}
+_IDF = {}
+
+
+def kb_terms(text: str) -> set:
+    """5-letter word stems (seat/seats, removal/removing match) plus bare numbers."""
+    return ({w[:5] for w in re.findall(r"[a-z]{3,}", text.lower()) if w not in _STOP}
+            | set(re.findall(r"\d+", text)))
+
+
+def _idf() -> dict:
+    if not _IDF:
+        # built from the training KB sentences by tools/build_kb_idf.py
+        z = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "kb_idf.json")))
+        _IDF.update(z["idf"])
+        _IDF["__unseen__"] = math.log(z["n_sentences"])
+    return _IDF
+
+
+def focus_kb(draft: str, kb: str) -> str:
+    """Long KB article -> the sentences that share the draft's rarer words or numbers (order kept)."""
+    sents = [s for s in _KB_SENT.split(kb.strip()) if s]
+    if len(sents) <= KB_MAX_SENTS:
+        return kb
+    idf = _idf()
+    d = kb_terms(draft)
+    score = [sum(idf.get(t, idf["__unseen__"]) for t in d & kb_terms(s)) for s in sents]
+    ranked = sorted(range(len(sents)), key=lambda i: -score[i])
+    keep = [i for i in ranked[:KB_MAX_SENTS] if score[i] >= KB_MIN_SCORE] or ranked[:1]
+    return " ".join(sents[i] for i in sorted(keep))
+
+
 def format_input(decision: str, state: Dict[str, Any]) -> Tuple[str, Optional[str]]:
     subj = normalize(str(state.get("subject") or ""))
     body = normalize(str(state.get("body") or ""))
@@ -262,7 +308,7 @@ def format_input(decision: str, state: Dict[str, Any]) -> Tuple[str, Optional[st
                 % (PROMPTS["approve"], tier, amt, subj, body)), None
     if decision == "grounded":
         draft = normalize(str(state.get("draft_reply") or ""))
-        kb = normalize(str(state.get("kb_article") or ""))
+        kb = focus_kb(draft, normalize(str(state.get("kb_article") or "")))
         if _STYLE["name"] == "short":
             return "%s %s" % (PROMPTS["grounded"], draft), kb
         return "%s Draft: %s" % (PROMPTS["grounded"], draft), "Article: %s" % kb

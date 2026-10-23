@@ -122,7 +122,9 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     aug_tasks = set(args.augment_tasks.split(",")) if args.augment_tasks else set(DECISIONS)
     if args.augment > 0:
         # augmented copies of the TRAINING rows only (fold validation stays clean)
+        from decide import augment as aug_mod
         from decide.augment import augment
+        aug_mod.FAMILIES = aug_mod.FAMILIES + [f for f in args.augment_extra.split(",") if f]
         tr_rows = list(tr_rows) + augment(tr_rows, args.augment, seed=args.seed)
         if soft is not None:
             soft = {k: np.concatenate([v] * (1 + args.augment)) for k, v in soft.items()}
@@ -314,6 +316,7 @@ def main():
                     help="layer-wise lr decay per encoder layer below the top, e.g. 0.85; 1 = off")
     ap.add_argument("--pool", default="mean", choices=["mean", "attn"],
                     help="attn = learned per-decision attention pooling")
+    ap.add_argument("--augment_extra", default="", help="extra augmentation families, e.g. kb_long")
     ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
     # extending the model with a new decision (see docs/extensibility.md)
     ap.add_argument("--tasks", default="route,approve,grounded", help="decisions trained in this run")
