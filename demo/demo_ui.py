@@ -1,7 +1,7 @@
 """
 Live-demo page for the three-minute demo. Not part of the graded API.
 
-  uvicorn demo_ui:app --host 0.0.0.0 --port 8000
+  python demo/demo_ui.py            (or: uvicorn demo.demo_ui:app --port 8000)
   open http://localhost:8000/
 
 This imports the real service from app.py unchanged and adds:
@@ -16,6 +16,11 @@ POST /v1/decide and GET /health are the same routes the judges hit, so
 selfcheck.py still works against this port.
 """
 
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
+
 import json
 import os
 import random
@@ -27,7 +32,7 @@ from fastapi.responses import FileResponse
 
 from app import app
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "demo", "index.html")
 _BASE = {}
 
@@ -113,3 +118,8 @@ def demo_minieval(n: int = 150, seed: int = 0):
                 "approve_acc": round(det["appr_acc"], 3), "grounded_acc": round(det["gr_acc"], 3),
                 "p95_ms": round(lat[int(0.95 * (len(lat) - 1))], 2)}
     return result
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host=os.environ.get("HOST", "0.0.0.0"), port=int(os.environ.get("PORT", "8000")))

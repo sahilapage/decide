@@ -7,8 +7,13 @@ honest dev number we cross-fit: fit the policy on one half of dev, score the
 other half, and swap (repeated over several random splits). The final policy
 is then fitted on all of dev.
 
-  python fit_policy_dev.py runs/e32_full/dev_logits.npz --out runs/e32_full/policy.json
+  python training/fit_policy_dev.py runs/e32_full/dev_logits.npz --out runs/e32_full/policy.json
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import json

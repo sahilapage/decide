@@ -9,7 +9,7 @@ run directories that the usual pipeline (finalize.sh) can consume unchanged:
                      approve_stage.json (model.pt etc. are symlinked)
 
   python tools/fit_approve_stage.py runs/v6t2_e17 runs/v6t2h_e17_s3
-  ./finalize.sh runs/v6t2_e17_st runs/v6t2h_e17_s3_st exports/v6t2h_s3_st
+  ./training/finalize.sh runs/v6t2_e17_st runs/v6t2h_e17_s3_st exports/v6t2h_s3_st
 """
 
 import json

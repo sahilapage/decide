@@ -14,13 +14,13 @@ FOLDS=$1; shift
 mkdir -p docs/stress "$CACHE"
 # serving code must match on both sides
 scp -q decide/*.py "$HOST:$REMOTE/decide/"
-scp -q model.py finalize.sh pack_student.py "$HOST:$REMOTE/"
+ssh "$HOST" "mkdir -p $REMOTE/training"; scp -q model.py "$HOST:$REMOTE/"; scp -q training/finalize.sh training/pack_student.py "$HOST:$REMOTE/training/"
 scp -q tools/stress_test.py tools/judge_cases.py "$HOST:$REMOTE/tools/"
-ssh "$HOST" "mkdir -p $REMOTE/tests"; scp -q tests/judge_cases.json "$HOST:$REMOTE/tests/"
+ssh "$HOST" "mkdir -p $REMOTE/tests"; scp -q tests/judge_cases.json tests/complex_cases.json "$HOST:$REMOTE/tests/"
 for RUN in "$@"; do
   NAME=$(basename "$RUN" | sed 's/_e17//')
   echo "=== $NAME"
-  ssh "$HOST" "cd $REMOTE && PY=.venv/bin/python ./finalize.sh $FOLDS $RUN exports/$NAME 2>&1 | grep -E 'cross-fitted|mean p95' | grep -v -i warn"
+  ssh "$HOST" "cd $REMOTE && PY=.venv/bin/python ./training/finalize.sh $FOLDS $RUN exports/$NAME 2>&1 | grep -E 'cross-fitted|mean p95' | grep -v -i warn"
   if [ "${STRESS_LOCAL:-0}" = "1" ]; then
     mkdir -p "$CACHE/$NAME/student"
     for F in meta.json model.onnx policy.json tokenizer.json; do
@@ -35,6 +35,6 @@ for RUN in "$@"; do
       && taskset -c $CPUS .venv/bin/python tools/stress_test.py --artifacts cand/$NAME --out docs/stress/$NAME.json 2>&1 \
       | grep -v -i warn | grep -E '^(clean|all_mixed|draft_ticket_ref|kb_single)'"
     scp -q "$HOST:$REMOTE/docs/stress/$NAME.json" docs/stress/
-    ssh "$HOST" "cd $REMOTE && taskset -c $CPUS .venv/bin/python tools/judge_cases.py --artifacts cand/$NAME 2>&1 | grep -E 'XX|as expected'"
+    ssh "$HOST" "cd $REMOTE && taskset -c $CPUS .venv/bin/python tools/judge_cases.py --artifacts cand/$NAME 2>&1 | grep -E 'XX|as expected'; taskset -c $CPUS .venv/bin/python tools/judge_cases.py --artifacts cand/$NAME --cases tests/complex_cases.json 2>&1 | grep -E 'XX|as expected'"
   fi
 done

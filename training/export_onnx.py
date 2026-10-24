@@ -1,11 +1,16 @@
 """
 Export a trained DecideNet to one ONNX graph for CPU serving.
 
-  python export_onnx.py runs/e32_full artifacts/student [--policy runs/e32_policy.json]
+  python training/export_onnx.py runs/e32_full artifacts/student [--policy runs/e32_policy.json]
 
 Writes model.onnx (fp32), model.int8.onnx (dynamic int8), tokenizer.json,
 meta.json and policy.json into the output folder.
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import json

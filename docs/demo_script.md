@@ -5,15 +5,15 @@ correctly refuses to answer, and explain one trade-off.
 
 ## Before the judge arrives
 
-* Start the service: `./start.sh`, or `.venv/bin/uvicorn demo_ui:app --port 8000` for the web page.
+* Start the service: `./start.sh`, or `.venv/bin/uvicorn demo.demo_ui:app --port 8000` for the web page.
 * Check it is up: `curl localhost:8000/health` should return `{"status":"ok","loaded":true}`.
-* Run `python demo.py` once to warm it up.
+* Run `python demo/demo.py` once to warm it up.
 
 ## 0:00 – 0:30 · What it is
 
 > "Decide is a System One decision model like Jev or Laya, but 25× smaller than Laya: 17M parameters on CPU, about 6 ms per call. One shared encoder answers three typed questions. Each answer comes with a calibrated probability and an abstain flag."
 
-## 0:30 – 1:30 · Show it working (`python demo.py`, cases 1, 3, 3b, 5, 5b)
+## 0:30 – 1:30 · Show it working (`python demo/demo.py`, cases 1, 3, 3b, 5, 5b)
 
 * **Case 1, one model:** the same ticket gets route, approve and grounded from one model, each in a few ms.
 * **Cases 3 and 3b, grounding catches one changed fact:**
@@ -29,7 +29,7 @@ correctly refuses to answer, and explain one trade-off.
 
 * **Case 2:** "Can someone help with my account please" gives a near-flat queue distribution (top probability about 0.34), and the model abstains.
 * **Case 4:** the same refund on the Free tier at $8, $22 and $60:
-  * $8 is approved (p 0.84).
+  * $8 is approved (p 0.85).
   * $22 abstains: p 0.61 is below the 0.75 break-even of the 3:1 cost, and the model is unsure, so a human decides.
   * $60 is held (p ≈ 0).
 

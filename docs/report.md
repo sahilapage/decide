@@ -94,9 +94,13 @@ Metric: the selfcheck total. "Cross-fit" means dev, with the policy fitted on ha
 | 19 | Approve stage + route probs / request-type words | stage | +0.00 | saturated |
 | 20 | Are the hidden refusals predictable? | – | AUC 0.46 (n-grams), 0.52 (network) | no: irreducible |
 | 21 | Loss options, OOF with stage (E1 GCE, E2 R-Drop, E3 LLRD, E4 attention pooling, E5 L2-SP) | 84.47 | +0.24 / −1.44 / +0.17 / +0.06 / +0.04 | only GCE looks positive (about 1σ) |
-| 22 | GCE + LLRD (E6); full seeds of E1/E6 | – | *running* | ship only on a clear OOF + fresh-clone win |
+| 22 | GCE + LLRD (E6), OOF with stage | 84.47 | +0.29 (paired sd 0.22) | about 1σ, not a clear win: not shipped |
 | 23 | Add a 4th decision later (Arhan, `docs/extensibility.md`) | joint 83.6 | 83.2 in 90 s | sharing is cheap in practice |
 | 24 | ECE floor simulation | – | route 0.018, approve 0.014 | ours (0.024 / 0.017) is at the sampling floor |
+| 25 | v7: tier ramps, amount == 0, phrase flags fed into the network (tab v2) | raw OOF 83.66 | 82.80 | the network memorises train labels; the boosted stage generalises better |
+| 26 | Approve stage compiled into the ONNX graph (`tools/embed_stage.py`) | numpy stage | parity 6e-7; selfcheck 85.87 | one graph, one forward pass; shipped |
+| 27 | v8: tab v3 (v2 + generalised scope / weekday checks in the network) | stage OOF 84.47 | 84.46 (sd 0.19); clean selfcheck 80.7 vs 85.7; cross-fit 82.8 | a tie on OOF, worse in-sample: not shipped |
+| 28 | Complex-query set (`tests/complex_cases.json`, 31 cases) + range normalisation | 27/31 | 29/31 | shipped |
 
 ## 5. Error analysis
 

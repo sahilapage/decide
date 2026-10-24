@@ -49,7 +49,7 @@ def main():
                 (R if d == "route" else A if d == "approve" else G).append(z)
         out = os.path.join(folder, "dev_onnx_%s.npz" % var.replace(".onnx", ""))
         np.savez(out, route=np.asarray(R), approve=np.asarray(A), grounded=np.asarray(G))
-        res = subprocess.run([sys.executable, "fit_policy_dev.py", out, "--out", out + ".policy.json"],
+        res = subprocess.run([sys.executable, "training/fit_policy_dev.py", out, "--out", out + ".policy.json"],
                              capture_output=True, text=True)
         line = [l for l in res.stdout.splitlines() if l.startswith("cross-fitted")]
         print("%-22s p95 %.2f ms | %s" % (var, float(np.percentile(lat, 95)), line[0] if line else res.stderr[-300:]),

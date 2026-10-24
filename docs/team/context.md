@@ -259,18 +259,18 @@ ticket + typed question
 ```bash
 ./start.sh                                               # serve on :8000
 python selfcheck.py --url http://localhost:8000/v1/decide
-python demo.py                                           # terminal demo
-.venv/bin/uvicorn demo_ui:app --port 8000                # web demo at http://localhost:8000/
+python demo/demo.py                                           # terminal demo
+.venv/bin/uvicorn demo.demo_ui:app --port 8000                # web demo at http://localhost:8000/
 ```
 
 Reproduce training (GPU box):
 
 ```bash
 M=jhu-clsp/ettin-encoder-17m
-python train_mt.py --model $M --out runs/v5_e17 --epochs 6 --lr 1e-4 --prompt short
-python train_mt.py --model $M --out runs/v5h_e17_s3 --full --epochs 6 --lr 1e-4 --prompt short --seed 3
-./finalize.sh runs/v5_e17 runs/v5h_e17_s3 exports/final_e17_s3
-python pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
+python training/train_mt.py --model $M --out runs/v5_e17 --epochs 6 --lr 1e-4 --prompt short
+python training/train_mt.py --model $M --out runs/v5h_e17_s3 --full --epochs 6 --lr 1e-4 --prompt short --seed 3
+./training/finalize.sh runs/v5_e17 runs/v5h_e17_s3 exports/final_e17_s3
+python training/pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
 ```
 
 ## 13. Likely judge questions (short answers)
@@ -298,7 +298,7 @@ python pack_student.py exports/final_e17_s3 exports/final_e17_s3/policy.json
 
 ## 14. Still to do
 
-* Rehearse the 3-minute demo with `python demo.py` or the web page. It shows:
+* Rehearse the 3-minute demo with `python demo/demo.py` or the web page. It shows:
   * a confident route
   * a correct refusal
   * grounded catching one changed fact

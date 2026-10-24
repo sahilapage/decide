@@ -1,12 +1,17 @@
 """
 In-process CPU latency + parity check for an exported student.
 
-  python bench_cpu.py artifacts/student [--n 300] [--variants model.onnx,model.int8.onnx] [--threads 4]
+  python tools/bench_cpu.py artifacts/student [--n 300] [--variants model.onnx,model.int8.onnx] [--threads 4]
 
 Times one request at a time (no batching) per decision type, after warm-up,
 and checks ONNX logits against the PyTorch dev logits if dev_logits.npz is
 present in the folder.
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import json

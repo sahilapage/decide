@@ -1,14 +1,19 @@
 """
 Multi-task fine-tuning of one shared encoder on all three decisions.
 
-  python train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32 --folds 5
-  python train_mt.py --model ... --out runs/e32_full --full          # final fit on all train
+  python training/train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32 --folds 5
+  python training/train_mt.py --model ... --out runs/e32_full --full          # final fit on all train
 
 Per fold it writes the out-of-fold logits (used to fit calibration and, for
 teachers, as distillation targets) and dev logits. With --soft, the route,
 approve and grounded targets are blended with a teacher's out-of-fold
 probabilities (knowledge distillation).
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import contextlib
@@ -122,7 +127,9 @@ def train_one(args, tr_rows, soft, device, eval_sets):
     aug_tasks = set(args.augment_tasks.split(",")) if args.augment_tasks else set(DECISIONS)
     if args.augment > 0:
         # augmented copies of the TRAINING rows only (fold validation stays clean)
+        from decide import augment as aug_mod
         from decide.augment import augment
+        aug_mod.FAMILIES = aug_mod.FAMILIES + [f for f in args.augment_extra.split(",") if f]
         tr_rows = list(tr_rows) + augment(tr_rows, args.augment, seed=args.seed)
         if soft is not None:
             soft = {k: np.concatenate([v] * (1 + args.augment)) for k, v in soft.items()}
@@ -314,6 +321,7 @@ def main():
                     help="layer-wise lr decay per encoder layer below the top, e.g. 0.85; 1 = off")
     ap.add_argument("--pool", default="mean", choices=["mean", "attn"],
                     help="attn = learned per-decision attention pooling")
+    ap.add_argument("--augment_extra", default="", help="extra augmentation families, e.g. kb_long")
     ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
     # extending the model with a new decision (see docs/extensibility.md)
     ap.add_argument("--tasks", default="route,approve,grounded", help="decisions trained in this run")

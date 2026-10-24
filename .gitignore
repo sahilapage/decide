@@ -19,3 +19,7 @@ runs/
 *.log
 exports/
 wheels/
+
+# local experiment output
+logs/
+cand/

@@ -39,7 +39,7 @@ def main():
         for lname, cpus in LAYOUTS.items():
             for var, threads, spin in PLANS:
                 env = dict(os.environ, DECIDE_SPIN=spin)
-                cmd = ["taskset", "-c", cpus, sys.executable, "bench_cpu.py", args.folder,
+                cmd = ["taskset", "-c", cpus, sys.executable, "tools/bench_cpu.py", args.folder,
                        "--n", str(args.n), "--variants", var, "--threads", threads]
                 out = subprocess.run(cmd, cwd=repo, env=env, capture_output=True, text=True).stdout
                 for line in out.splitlines():

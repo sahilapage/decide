@@ -60,7 +60,7 @@ wall-clock.
    in `export_onnx.py`.
 3. **Train on top of the shipped model**:
    ```bash
-   python train_mt.py --model jhu-clsp/ettin-encoder-17m --prompt short --full --seed 3 \
+   python training/train_mt.py --model jhu-clsp/ettin-encoder-17m --prompt short --full --seed 3 \
        --tasks urgent --init_from <shipped run>/model.pt --replay 0.3 --epochs 4 --lr 3e-5
    ```
    (add `--freeze_encoder` instead of `--replay` to keep the other answers
@@ -73,10 +73,10 @@ wall-clock.
 
 ```bash
 C="--model jhu-clsp/ettin-encoder-17m --prompt short --augment 2 --augment_tasks grounded --full --seed 3"
-python train_mt.py $C --out runs/ext/joint --epochs 6 --lr 1e-4
-python train_mt.py $C --out runs/ext/base  --epochs 6 --lr 1e-4 --tasks route,approve
+python training/train_mt.py $C --out runs/ext/joint --epochs 6 --lr 1e-4
+python training/train_mt.py $C --out runs/ext/base  --epochs 6 --lr 1e-4 --tasks route,approve
 A="--tasks grounded --init_from runs/ext/base/model.pt"
-python train_mt.py $C --out runs/ext/tune_n0   $A --replay 0.3 --epochs 4 --lr 3e-5
-python train_mt.py $C --out runs/ext/frozen_n0 $A --freeze_encoder --epochs 10 --lr 1e-4
+python training/train_mt.py $C --out runs/ext/tune_n0   $A --replay 0.3 --epochs 4 --lr 3e-5
+python training/train_mt.py $C --out runs/ext/frozen_n0 $A --freeze_encoder --epochs 10 --lr 1e-4
 python tools/extend_eval.py --new grounded --base runs/ext/base --ref runs/ext/joint runs/ext/tune_n0 runs/ext/frozen_n0
 ```
