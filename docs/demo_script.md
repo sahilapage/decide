@@ -29,7 +29,7 @@ correctly refuses to answer, and explain one trade-off.
 
 * **Case 2:** "Can someone help with my account please" gives a near-flat queue distribution (top probability about 0.34), and the model abstains.
 * **Case 4:** the same refund on the Free tier at $8, $22 and $60:
-  * $8 is approved (p 0.84).
+  * $8 is approved (p 0.85).
   * $22 abstains: p 0.61 is below the 0.75 break-even of the 3:1 cost, and the model is unsure, so a human decides.
   * $60 is held (p ≈ 0).
 
