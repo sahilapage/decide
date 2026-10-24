@@ -128,17 +128,24 @@ def augment_row(row, rng, kb_pool):
             ss = _sents(s.get("kb_article"))
             rng.shuffle(ss)
             s["kb_article"] = " ".join(ss)
-        elif f == "kb_distractor":
-            d_facts = number_facts(normalize(str(s.get("draft_reply") or "")))
-            for _ in range(5):
-                cand = rng.choice(_sents(rng.choice(kb_pool)) or [""])
-                # never let the extra sentence supply a number the draft states
-                if cand and not any(fact_supported(f_, number_facts(normalize(cand))) for f_ in d_facts):
-                    ss = _sents(s.get("kb_article"))
-                    ss.insert(rng.randint(0, len(ss)), cand)
-                    s["kb_article"] = " ".join(ss)
-                    break
+        elif f in ("kb_distractor", "kb_long"):
+            # kb_long: a fuller article, 2-5 unrelated sentences instead of one
+            for _ in range(1 if f == "kb_distractor" else rng.randint(2, 5)):
+                add_distractor(s, rng, kb_pool)
     return r
+
+
+def add_distractor(s, rng, kb_pool):
+    """Insert one sentence from another article that supplies none of the draft's numbers."""
+    d_facts = number_facts(normalize(str(s.get("draft_reply") or "")))
+    for _ in range(5):
+        cand = rng.choice(_sents(rng.choice(kb_pool)) or [""])
+        # never let the extra sentence supply a number the draft states
+        if cand and not any(fact_supported(f_, number_facts(normalize(cand))) for f_ in d_facts):
+            ss = _sents(s.get("kb_article"))
+            ss.insert(rng.randint(0, len(ss)), cand)
+            s["kb_article"] = " ".join(ss)
+            return
 
 
 def augment(rows, copies, seed=0):

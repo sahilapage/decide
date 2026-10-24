@@ -115,6 +115,52 @@ With the approve second stage added (model card, "Approve second stage"):
 **85.87**, cross-fitted 85.1; robustness unchanged (kb_single 78.8,
 draft_ticket_ref 85.4, judge cases 25 / 26).
 
+### Round 3: "complex" queries (longer, multi-part tickets and long articles)
+
+The hidden set is described as containing more complex queries. We added five
+label-preserving variants to `tools/stress_test.py` (run with `--only`):
+
+| variant | what changes |
+|---|---|
+| long_body | 2–4 neutral sentences from tickets with the same route and approve labels |
+| multi_issue | a second, less urgent issue from another queue ("Separately, less urgent: …") |
+| long_kb | 3–5 sentences from other KB articles inserted into the article (never ones stating the draft's numbers) |
+| thread | the ticket wrapped in an email thread: greeting, sign-off, quoted earlier message |
+| complex_all | all four at once |
+
+Moved sentences never contain one of the four approve-blocking phrases or a plan
+name, so the true approve label can't change. No input exceeds the 192-token
+limit, so truncation is not a factor.
+
+**Weak spot: long KB articles.** Every train/dev article has 2–4 sentences. With
+7–9 sentences, the encoder misses the supporting sentence and calls correct
+drafts unsupported with p ≈ 0, which costs abstention as well as accuracy.
+
+**Fix, at inference only** (`decide/textfmt.py` `focus_kb`): for articles longer
+than 5 sentences, the encoder reads the (at most 4) sentences that share the
+draft's rarer terms, ranked by summed rarity (`decide/kb_idf.json`, built from
+training KB sentences by `tools/build_kb_idf.py`). The number/scope flags still
+read the full article. No clean article has more than 4 sentences, so
+`format_input` is byte-identical on all 8,000 train+dev rows, and the
+fresh-checkout `selfcheck.py` score is unchanged at **85.87**.
+
+Shipped model (approve stage included), same variants with and without the focus:
+
+| variant | without | with focus | grounded acc |
+|---|---|---|---|
+| clean, kb_distractor, multi_issue, long_body, thread | – | identical | – |
+| long_kb | 78.57 | **81.44** | 0.914 → 0.957 |
+| complex_all | 76.35 | **80.89** | 0.899 → 0.957 |
+
+Also tried: training with a `kb_long` augmentation family (2–5 distractor
+sentences; `train_mt.py --augment_extra kb_long`). Once the focus is on, it
+added nothing on long_kb (0.959 vs 0.957), lost a little on kb_single (0.912 vs
+0.927), and cross-fitted 83.5 vs 84.1 on clean dev, so it is not shipped.
+
+**Remaining gap: multi-issue routing.** With a second issue from another queue,
+route accuracy falls from 0.891 to 0.847 (total 85.7 → 83.7). Approve is
+unaffected (0.891 vs 0.899) and grounded is perfect.
+
 ### Cost on clean data
 
 Each run's policy is cross-fitted on dev, with 10 halves per run:
