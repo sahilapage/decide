@@ -98,15 +98,11 @@ python selfcheck.py --url http://localhost:8000/v1/decide                     # 
 
 Different seeds land within about 1 point of 85.9 on dev.
 
-## Pretrained models and licences
+## Pretrained model and licence
 
 | Model | Used for | Licence |
 |---|---|---|
 | [jhu-clsp/ettin-encoder-17m](https://huggingface.co/jhu-clsp/ettin-encoder-17m) | shipped backbone | MIT |
-| [jhu-clsp/ettin-encoder-32m / -150m / -400m](https://huggingface.co/jhu-clsp) | compared / teachers (training only) | MIT |
-| [microsoft/deberta-v3-large](https://huggingface.co/microsoft/deberta-v3-large) | teacher (training only) | MIT |
-| [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya) | teacher (training only) | Apache-2.0 |
-| [KRLabsOrg/tinylettuce-ettin-17m-en](https://huggingface.co/KRLabsOrg/tinylettuce-ettin-17m-en) | experiment (not shipped) | MIT |
 
 Training data: only the provided train split. Versions: Python 3.11, onnxruntime 1.23,
 tokenizers 0.22, fastapi 0.161; training with torch 2.8 and transformers 5.20.
