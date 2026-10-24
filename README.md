@@ -18,10 +18,10 @@ with calibrated probabilities and an abstain flag.
 | Part | Score | Weight | Points |
 |---|---|---|---|
 | Quality | 0.856 | 40% | 34.26 |
-| Calibration | 0.876 | 25% | 21.90 |
-| Latency (p95 5.2 ms) | 1.000 | 20% | 20.00 |
+| Calibration | 0.877 | 25% | 21.91 |
+| Latency (p95 6.6 ms) | 1.000 | 20% | 20.00 |
 | Abstention | 0.647 | 15% | 9.71 |
-| **Total** | | | **85.87 / 100** |
+| **Total** | | | **85.88 / 100** |
 
 All gates pass: schema 4500 / 4500 valid, reachable, latency under 100 ms.
 
@@ -46,6 +46,30 @@ All three decisions go through **one encoder** (`jhu-clsp/ettin-encoder-17m`, fi
 A typed prompt (`route:`, `approve:`, `grounded:`) tells it which question is asked.
 About 99% of the parameters are shared; each decision has only a small head on top
 (`decide/net.py`). Everything runs as one ONNX graph on CPU, with no network calls.
+
+## Guardrails
+
+Two rules run after the model (`decide/guardrails.py`). Both come from the training data only, and
+neither changes an answer on train or dev.
+
+* **Red flags → hold.** A repeat request, a brand-new account, a request for an exception or a
+  chargeback threat was refused in every one of the 456 training tickets that had one. The model
+  learned the template wording, so a reworded one could slip through; with one of these phrases,
+  approve now holds.
+* **Unfamiliar article → less confident.** If most of the help article's words never appear in any
+  training article, grounded keeps its answer but pulls its probability towards 0.5 instead of
+  claiming 0 or 1.
+
+## Extra tests
+
+Our own test tickets, in the same format as `data/dev.jsonl` (`python test.py <file>`):
+
+| Set | What it is | Score |
+|---|---|---|
+| `tests/similar20.jsonl` | 20 new tickets in the same style as dev | 86.6 |
+| `tests/make_complex20.py` | 20 dev tickets with 2–3 label-preserving rewrites each (typos, threads, extra issues, longer articles) | 79.4 |
+| `tests/foreign_set.jsonl` | 40 tickets on new products and help-article topics | 58.2 |
+| `tests/judge_cases.json`, `tests/complex_cases.json` | hand-typed edge cases (`python tools/judge_cases.py --cases …`) | 30 / 33, 30 / 31 |
 
 ## Graphs
 

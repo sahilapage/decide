@@ -1,5 +1,5 @@
 {
-  "url": "http://localhost:8000/v1/decide",
+  "url": "http://127.0.0.1:8000/v1/decide",
   "eval": "data/dev.jsonl",
   "n_records": 1500,
   "n_calls": 4500,
@@ -16,19 +16,19 @@
   },
   "latency_ms": {
     "p50": {
-      "route": 3.6081950001971563,
-      "approve": 3.8022485005058115,
-      "grounded": 4.5464964996426716
+      "route": 4.4087840360589325,
+      "approve": 4.821423499379307,
+      "grounded": 6.309446995146573
     },
     "p95": {
-      "route": 4.655322598409839,
-      "approve": 4.754817500997888,
-      "grounded": 5.416538398640114
+      "route": 5.912939104018733,
+      "approve": 6.34632877772674,
+      "grounded": 7.434867697884329
     },
-    "mean_p95": 4.9422261660159466,
-    "overall_p50": 4.019084500214376,
-    "overall_p95": 5.129052649772348,
-    "server_self_reported_p95": 4.2121,
+    "mean_p95": 6.5647118598766,
+    "overall_p50": 5.178908002562821,
+    "overall_p95": 7.0397928851889455,
+    "server_self_reported_p95": 6.5361,
     "reconnects": 0
   },
   "quality": {
@@ -51,15 +51,15 @@
     }
   },
   "calibration": {
-    "route_ece": 0.024396840882953092,
-    "approve_ece": 0.016665674135567667,
-    "grounded_ece": 0.00014044482240224557,
-    "approve_brier": 0.0771536531027432,
-    "grounded_brier": 3.830154680889639e-06,
-    "mean_ece": 0.013734319946974336,
-    "mean_brier": 0.03857874162871205,
-    "brier_skill": 0.8208427613040779,
-    "route_brier": 0.17307950137150174
+    "route_ece": 0.024396844099567116,
+    "approve_ece": 0.01619225606644751,
+    "grounded_ece": 0.00014044877209831692,
+    "approve_brier": 0.07702968915832731,
+    "grounded_brier": 3.830638864954463e-06,
+    "mean_ece": 0.013576516312704312,
+    "mean_brier": 0.03851675989859613,
+    "brier_skill": 0.8210132491799501,
+    "route_brier": 0.17307949657321953
   },
   "abstention": {
     "risk_at_80": {
@@ -80,9 +80,9 @@
   },
   "score_parts": {
     "quality": 0.8563810855917792,
-    "calibration": 0.8760855807846031,
+    "calibration": 0.8765653338082142,
     "latency": 1.0,
     "abstention": 0.6474384859742637
   },
-  "score": 85.8689602329002
+  "score": 85.88095405849047
 }

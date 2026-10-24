@@ -26,3 +26,6 @@ cand/
 
 # per-ticket dev predictions + labels for the figures
 docs/figures/data/
+
+# built from dev rows by tests/make_complex20.py (dev text is not committed)
+tests/complex20.jsonl

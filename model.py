@@ -17,6 +17,7 @@ import os
 import pickle
 from typing import Any, Dict, List, Tuple
 
+from decide import guardrails
 from decide.policy import Policy
 
 QUEUES: List[str] = ["billing", "technical", "account", "shipping", "general"]
@@ -73,9 +74,15 @@ class DecisionModel:
         if not str(state.get("subject") or "").strip() and not str(state.get("body") or "").strip():
             # nothing to read about the request: never auto-approve blind
             abstain = True
+        if guardrails.red_flag(state):
+            # a disqualifying phrase: every such training ticket was refused (decide/guardrails.py)
+            value, p = False, min(p, 0.02)
         return bool(value), p, bool(abstain)
 
     # -- grounding ----------------------------------------------------------
     def grounded(self, state: Dict[str, Any]) -> Tuple[bool, float, bool]:
         value, p, abstain = self.policy.grounded(self._logit("grounded", state))
+        if guardrails.kb_novelty(state) > guardrails.NOVEL_KB:
+            # an article unlike any training article: same answer, less confidence (decide/guardrails.py)
+            p = 0.5 + guardrails.NOVEL_SHRINK * (p - 0.5)
         return bool(value), p, bool(abstain)
