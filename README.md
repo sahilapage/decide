@@ -50,12 +50,8 @@ About 99% of the parameters are shared; each decision has only a small head on t
 ## Graphs
 
 <p align="center">
-  <img src="docs/figures/13_calibration.png" alt="Calibration: predicted vs actual" width="49%">
-  <img src="docs/figures/14_coverage.png" alt="Accuracy against share of tickets answered" width="49%">
-</p>
-
-<p align="center">
-  <img src="docs/figures/15_approve_curve.png" alt="Approve probability against refund amount per plan" width="100%">
+  <img src="docs/figures/1_score_vs_ceiling.png" alt="Points per score part against the maximum possible" width="49%">
+  <img src="docs/figures/2_score_progression.png" alt="Total score from the 77.0 baseline to 85.9" width="49%">
 </p>
 
 ## Reproduce

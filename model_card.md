@@ -162,7 +162,7 @@ Approve commits to "yes" only when p > 0.75, where 3·(1−p) < p.
   has picked that up from the amount it reads in the prompt: an enterprise
   refund of $200.00–$200.99 gets p ≈ 0.05–0.10 (hold) while $199.99 or $205 get
   p ≈ 0.85; $100 and $140 are pulled down to the abstain zone. Rare in data
-  that looks like the training set; visible in `docs/figures/15_approve_curve.png`.
+  that looks like the training set.
 * **Paraphrased refusal reasons.** The disqualifying phrases are learned from
   the training templates; a hand-written paraphrase ("I'll file a chargeback
   with my card company") is not always recognised and can be auto-approved
