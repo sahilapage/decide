@@ -484,5 +484,5 @@ Commands to reproduce are in the README ("Reproduce").
 * **Arhan:** CPU latency work and benchmarks (layouts, threads, int8 study),
   independent verification and reproduction, loss and architecture ablations,
   the extensibility experiment, the complex-query test sets and long-KB fix,
-  the training-size study, `test.py`, the demo page, repository organisation
+  the training-size study, `test.py`, repository organisation
   and figures.
