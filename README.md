@@ -56,18 +56,47 @@ About 99% of the parameters are shared; each decision has only a small head on t
 
 ## Reproduce
 
+The trained model is already in `artifacts/student/`, so this is only needed to rebuild it.
+Training needs a GPU; run every command from the repository root.
+
+**1. Setup.** Put `train.jsonl` and `dev.jsonl` in `data/`, then:
+
 ```bash
-pip install -r requirements-train.txt                                     # GPU box
-python training/train_baseline.py                                         # gate-1 baseline
-M=jhu-clsp/ettin-encoder-17m
-C="--model $M --epochs 6 --lr 1e-4 --prompt short --augment 2 --augment_tasks grounded"
-python training/train_mt.py $C --out runs/v6t2_e17                        # 5-fold out-of-fold run
-python training/train_mt.py $C --out runs/v6t2h_e17_s3 --full --seed 3    # the shipped network
-python tools/fit_approve_stage.py runs/v6t2_e17 runs/v6t2h_e17_s3
-./training/finalize.sh runs/v6t2_e17_st runs/v6t2h_e17_s3_st exports/v6t2h_s3_st
-python tools/embed_stage.py exports/v6t2h_s3_st --check data/dev.jsonl
-python training/pack_student.py exports/v6t2h_s3_st exports/v6t2h_s3_st/policy.json
+pip install -r requirements-train.txt
 ```
+
+**2. Baseline** (gate 1, writes `artifacts/baseline.pkl`):
+
+```bash
+python training/train_baseline.py
+```
+
+**3. Train the shared model.** The 5-fold run gives out-of-fold predictions for calibration;
+the full run is the network we ship.
+
+```bash
+C="--model jhu-clsp/ettin-encoder-17m --epochs 6 --lr 1e-4 --prompt short --augment 2 --augment_tasks grounded"
+python training/train_mt.py $C --out runs/folds                      # 5-fold run
+python training/train_mt.py $C --out runs/full --full --seed 3       # shipped network
+```
+
+**4. Approve tree layer, calibration and ONNX export.**
+
+```bash
+python tools/fit_approve_stage.py runs/folds runs/full               # writes runs/folds_st, runs/full_st
+./training/finalize.sh runs/folds_st runs/full_st exports/student    # calibrate, export, benchmark
+python tools/embed_stage.py exports/student --check data/dev.jsonl  # put the trees into the ONNX graph
+```
+
+**5. Install the new model and check it.**
+
+```bash
+python training/pack_student.py exports/student exports/student/policy.json   # copies into artifacts/student/
+./start.sh                                                                    # terminal 1
+python selfcheck.py --url http://localhost:8000/v1/decide                     # terminal 2
+```
+
+Different seeds land within about 1 point of 85.9 on dev.
 
 ## Pretrained models and licences
 
