@@ -20,7 +20,7 @@ import os
 
 import numpy as np
 
-from decide.policy import fit_policy, sigmoid, softmax
+from decide.policy import fit_policy
 from decide.scoring import score
 
 QUEUES = ["billing", "technical", "account", "shipping", "general"]

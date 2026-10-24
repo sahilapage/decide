@@ -23,3 +23,6 @@ wheels/
 # local experiment output
 logs/
 cand/
+
+# per-ticket dev predictions + labels for the figures (rebuild: python tools/figure_data.py)
+docs/figures/data/

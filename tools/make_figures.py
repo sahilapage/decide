@@ -257,8 +257,10 @@ def losses():
             ("R-Drop consistency", 84.05), ("attention pooling", 83.12), ("focal loss", 81.97),
             ("GCE (noise-robust)", 80.68)]
     fig, ax = figure("Six loss and architecture tweaks: none beats plain training",
-                     "Out-of-fold total on 6,500 train tickets, Ettin-17M, same seed. The ones that lost did so on "
-                     "grounded confidence, not accuracy. Route/approve accuracy stayed within ±0.3.")
+                     "Out-of-fold total on 6,500 train tickets, Ettin-17M, same seed, no augmentation or tree stage. The ones "
+                     "that lost did so on grounded confidence, not accuracy. A second run on the shipped recipe "
+                     "(augmentation + tree stage, docs/report.md #21-22) found GCE +0.24 and GCE + LR decay +0.29, "
+                     "about 1 sd: not enough to ship either.")
     y = np.arange(len(rows))[::-1]
     base = rows[0][1]
     ax.axvspan(base - 0.5, base + 0.5, color=GRID, alpha=0.6, zorder=0)
@@ -357,7 +359,178 @@ def approve_stage():
     save(fig, "11_approve_stage.png")
 
 
+# ---------------------------------------------------------------------------
+# Figures 12-15. 13-15 plot docs/figures/data/model_dev.json, written by
+# tools/figure_data.py from the shipped model's own answers on dev.
+
+def architecture():
+    from matplotlib.patches import FancyBboxPatch
+    fig, ax = plt.subplots(figsize=(13, 6.6), dpi=160)
+    ax.set_xlim(-1.5, 131.5)
+    ax.set_ylim(0, 66)
+    ax.axis("off")
+    ax.text(0, 64, "One request, one forward pass, one typed answer", fontsize=20, fontweight="bold", va="top")
+    ax.text(0, 59.6, "Everything inside the dashed box is a single ONNX graph (artifacts/student/model.onnx).",
+            fontsize=12, color=INK2, va="top")
+
+    def box(x, y, w, h, title, body, fill="#ffffff", edge="#d9d7d1", tc=INK, bc=INK2, tag=None, tagc=BLUE):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.3,rounding_size=1.4",
+                                    fc=fill, ec=edge, lw=1.3, zorder=2))
+        top = y + h - 1.4
+        if tag:
+            ax.text(x + 1.1, top, tag, fontsize=9, color=tagc, fontweight="bold", va="top", zorder=3,
+                    family="DejaVu Sans Mono")
+            top -= 3.0
+        ax.text(x + 1.1, top, title, fontsize=12.5, fontweight="bold", color=tc, va="top", zorder=3)
+        ax.text(x + 1.1, top - 3.4, body, fontsize=10, color=bc, va="top", zorder=3, linespacing=1.45)
+
+    def arrow(x0, y0, x1, y1):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0), zorder=1,
+                    arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.5, shrinkA=0, shrinkB=0))
+
+    mid = 31
+    box(0, 16, 19, 30, "Request", "decision:\nroute, approve\nor grounded\n\nticket: subject,\nbody, tier, amount\n\ndraft reply +\nKB article")
+    box(23, 16, 22, 30, "Clean + check", "\"two weeks\" = \"14 days\"\ntypo repair, ranges\n\nfact flags: numbers\nor scope the KB\ndoes not state\n\nlong KB: keep the\nrelevant sentences",
+        tag="OURS")
+    ax.add_patch(FancyBboxPatch((48.5, 4), 54, 49, boxstyle="round,pad=0.3,rounding_size=2",
+                                fc="none", ec=MUTED, lw=1.2, ls=(0, (5, 4)), zorder=1))
+    ax.text(49.5, 51.8, "one ONNX graph", fontsize=9.5, color=MUTED, va="top", family="DejaVu Sans Mono")
+    box(50.5, 16, 21, 30, "Ettin-17M", "shared encoder:\none set of weights\nreads all three\nquestions\n\na typed prompt\nnames the question\n\nopen source (MIT),\nfine-tuned by us",
+        fill=INK, edge=INK, tc="#ffffff", bc="#c9ced6", tag="SHARED", tagc="#f0a15e")
+    heads = [(37.5, 10, "Route head", "linear layer -> 5 queues"),
+             (21.5, 13, "Approve head", "small MLP + 60 boosted\ntrees (amount / tier cap,\nrefusal phrases)"),
+             (6.5, 11.5, "Grounded head", "small MLP + learned\nweight on fact flags")]
+    for y, h, t, b in heads:
+        box(76, y, 24.5, h, t, b)
+        arrow(72.3, mid, 75.6, y + h / 2)
+    box(106, 16, 24, 30, "Calibrate + abstain", "noise-aware softmax;\nPlatt with floor and\nceiling\n\napprove only if\np > 0.75 (3:1 cost)\n\nabstain when unsure",
+        tag="OURS")
+    arrow(19.6, mid, 22.6, mid)
+    arrow(45.6, mid, 50.1, mid)
+    for y, h, _, _ in heads:
+        arrow(101.1, y + h / 2, 105.6, mid)
+    ax.text(106, 13.5, "-> {value, p, abstain}", fontsize=11, color=INK, family="DejaVu Sans Mono", va="top")
+    ax.text(0, 1.2, "~6 ms p95 on 4 CPU threads  ·  68 MB  ·  no network, no GPU  ·  a 4th decision = one prompt + one head",
+            fontsize=11.5, color=INK2)
+    save(fig, "12_architecture.png")
+
+
+def _model_data():
+    return load_json("docs", "figures", "data", "model_dev.json")
+
+
+def calibration():
+    d = _model_data()
+    fig, ax = figure("Calibrated: when it says 80%, it is right about 80% of the time",
+                     "Shipped model on the 1,500 dev tickets, bins 0.1 wide (bins under 15 tickets left out); dot size = tickets per bin. "
+                     "Route: top-queue confidence vs accuracy. Approve: p(approve) vs share actually approved. "
+                     "Grounded is 100% correct with p ≈ 0 or 1 (ECE 0.0001), so it is left off.")
+    ax.plot([0, 1], [0, 1], color=MUTED, lw=1.5, ls="--", zorder=1)
+    ax.text(0.30, 0.25, "perfect calibration", color=MUTED, fontsize=11, rotation=33, ha="center")
+    rc = json.load(open(os.path.join(ROOT, "results.json")))["calibration"]
+    series = [("route", BLUE, [(c, ok) for c, ok, _ in d["route"]], rc["route_ece"]),
+              ("approve", ORANGE, [(p, y) for p, y, _, _ in d["approve"]], rc["approve_ece"])]
+    for name, col, pairs, ece in series:
+        a = np.array(pairs, dtype=float)
+        idx = np.minimum((a[:, 0] * 10).astype(int), 9)
+        bins = [a[idx == k] for k in range(10) if (idx == k).sum() >= 15]
+        xs = [b[:, 0].mean() for b in bins]
+        ys = [b[:, 1].mean() for b in bins]
+        ax.plot(xs, ys, color=col, lw=2.2, zorder=2)
+        ax.scatter(xs, ys, s=[len(b) * 0.9 for b in bins], color=col, edgecolor=SURFACE, lw=1.5, zorder=3,
+                   label="%s  (ECE %.3f)" % (name, ece))
+    ax.set_xlim(0, 1.02)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("predicted probability")
+    ax.set_ylabel("observed frequency")
+    ax.legend(loc="upper left", fontsize=13)
+    ax.text(0.98, 0.62, "route tops out near 0.95: ~5% of\nroute labels are random, so no\nticket is ever 100% sure\n\napprove tops out near 0.85: some\nsmall refunds are refused for\nhistory the ticket never shows",
+            ha="right", va="top", fontsize=11, color=INK2)
+    save(fig, "13_calibration.png")
+
+
+def coverage():
+    d = _model_data()
+    fig, ax = figure("It knows which answers to trust: fewer answers, fewer mistakes",
+                     "Accuracy on the k% of dev tickets the model is most confident about (route: top-queue "
+                     "probability; approve: distance of p from 0.5). Dots = where the shipped abstain policy "
+                     "operates; the judges' quality target is 80% coverage.")
+    series = [("route", BLUE, [(c, ok, ab) for c, ok, ab in d["route"]]),
+              ("approve", ORANGE, [(abs(p - 0.5), ok, ab) for p, _, ok, ab in d["approve"]])]
+    ks = np.arange(10, 101)
+    lines = []
+    for name, col, rows in series:
+        rows.sort(key=lambda r: -r[0])
+        ok = np.array([r[1] for r in rows], dtype=float)
+        acc = [ok[: max(1, int(round(len(ok) * k / 100)))].mean() * 100 for k in ks]
+        ax.plot(ks, acc, color=col, lw=2.4, label=name)
+        cov = 100 * (1 - np.mean([r[2] for r in rows]))
+        ans = [r[1] for r in rows if not r[2]]
+        ax.scatter([cov], [100 * np.mean(ans)], s=130, color=col, edgecolor=INK, lw=1.2, zorder=4)
+        dy = 2.2 if name == "route" else -2.6
+        ax.annotate("shipped %s: answers %.0f%%,\n%.1f%% of those right" % (name, cov, 100 * np.mean(ans)),
+                    xy=(cov, 100 * np.mean(ans)), xytext=(cov - 23, 100 * np.mean(ans) + dy), fontsize=11,
+                    color=INK, arrowprops=dict(arrowstyle="-", color=MUTED, lw=1))
+        lines.append("%s %.1f%%" % (name, acc[-1]))
+    ax.axvline(80, color=MUTED, lw=1.3, ls="--")
+    ax.text(80.6, 99.6, "80% target", color=MUTED, fontsize=11, va="top")
+    ax.text(99, 86.0, "answer everything:\n" + ", ".join(lines), ha="right", fontsize=11, color=INK2)
+    ax.set_xlim(10, 101)
+    ax.set_ylim(85, 100.5)
+    ax.set_xlabel("share of tickets answered, most confident first (%)")
+    ax.set_ylabel("accuracy on answered tickets (%)")
+    ax.legend(loc="lower left", fontsize=13)
+    save(fig, "14_coverage.png")
+
+
+def approve_curve():
+    d = _model_data()
+    caps = {"free": 25, "pro": 110, "enterprise": 385}
+    fig, axes = plt.subplots(1, 3, figsize=(12, 6.75), dpi=160, sharey=True)
+    fig.suptitle("Approve: the same refund on every plan, swept over the amount",
+                 x=0.06, ha="left", fontsize=20, fontweight="bold", color=INK)
+    for ax, (tier, col) in zip(axes, [("free", BLUE), ("pro", ORANGE), ("enterprise", AQUA)]):
+        pts = np.array(d["sweep"][tier], dtype=float)
+        amt, p, ab = pts[:, 0], pts[:, 1], pts[:, 3]
+        on = False
+        for i in range(len(amt)):
+            if ab[i] and not on:
+                start, on = amt[i], True
+            if on and (not ab[i] or i == len(amt) - 1):
+                ax.axvspan(start, amt[i], color=GRID, alpha=0.9, zorder=0)
+                on = False
+        ax.plot(amt, p, color=col, lw=2.6, zorder=3)
+        ax.axhline(0.75, color=INK, lw=1.2, ls="--", zorder=2)
+        ax.axvline(caps[tier], color=MUTED, lw=1, ls=":", zorder=2)
+        ax.text(caps[tier], 0.93 if tier == "enterprise" else 1.0, " cap ~$%d" % caps[tier], color=INK2,
+                fontsize=10.5, va="top")
+        ax.set_title(tier, fontsize=15, fontweight="bold", color=col, loc="left")
+        ax.set_xlabel("refund amount ($)")
+        ax.set_ylim(-0.02, 1.05)
+        ax.set_xlim(0, amt[-1])
+        ax.grid(axis="x", visible=False)
+    ent = np.array(d["sweep"]["enterprise"], dtype=float)
+    k = int(np.argmin(np.where(ent[:, 0] < 380, ent[:, 1], 9)))
+    if ent[k, 1] < 0.5:
+        axes[2].annotate("dip at $%.2f: known weak spot\n(\"$200\" tickets in training were\nall refused; see model card)" % ent[k, 0],
+                         xy=(ent[k, 0], ent[k, 1]), xytext=(15, 1.04), fontsize=10, color=INK2, va="top",
+                         arrowprops=dict(arrowstyle="-", color=MUTED, lw=1))
+    axes[0].set_ylabel("p(approve), calibrated")
+    axes[0].text(1, 0.77, "approve if p > 0.75", fontsize=10.5, color=INK, va="bottom")
+    fig.text(0.06, -0.02, textwrap.fill(
+        "Ticket: \"Please refund my last charge, I did not use it.\", amounts with cents as in the data. Shaded = the model abstains and hands the "
+        "case to a human. A wrong approval costs 3x a wrong hold, so approving pays only above p = 0.75. "
+        "About 15-20% of small refunds are refused in the data for account history the ticket never shows, "
+        "so p never goes above ~0.85.", 125), color=MUTED, fontsize=11, va="top")
+    fig.subplots_adjust(top=0.84, wspace=0.12, left=0.07, right=0.98)
+    save(fig, "15_approve_curve.png")
+
+
 if __name__ == "__main__":
+    architecture()
+    calibration()
+    coverage()
+    approve_curve()
     score_vs_ceiling()
     score_progression()
     latency()

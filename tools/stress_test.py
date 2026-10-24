@@ -33,7 +33,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from decide.scoring import score  # noqa: E402
-from model import DecisionModel, QUEUES  # noqa: E402
+from model import DecisionModel  # noqa: E402
 from decide.normalize import normalize  # noqa: E402
 from decide.textfmt import fact_supported, number_facts  # noqa: E402
 

@@ -19,7 +19,7 @@ coverage kept just above the 80% target.
 
 import json
 import math
-from typing import Dict, List
+from typing import Dict
 
 import numpy as np
 
