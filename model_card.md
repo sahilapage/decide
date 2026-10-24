@@ -164,9 +164,18 @@ Approve commits to "yes" only when p > 0.75, where 3·(1−p) < p.
   p ≈ 0.85; $100 and $140 are pulled down to the abstain zone. Rare in data
   that looks like the training set.
 * **Paraphrased refusal reasons.** The disqualifying phrases are learned from
-  the training templates; a hand-written paraphrase ("I'll file a chargeback
-  with my card company") is not always recognised and can be auto-approved
-  at p ≈ 0.85 (`tests/judge_cases.json` a7–a11).
+  the training templates. A guardrail (`decide/guardrails.py`) now holds any
+  request whose text matches the four refusal-phrase types (all 456 such
+  training tickets were refused), which fixed a7–a11 in
+  `tests/judge_cases.json`. Wordings the patterns do not cover can still be
+  auto-approved at p ≈ 0.85, and a negated phrase ("this is not a chargeback")
+  is held by mistake.
+* **Unfamiliar help articles.** On articles about topics no training article
+  covers, grounded accuracy fell to about 72% on our own 40-ticket set
+  (`tests/foreign_set.jsonl`) with p ≈ 0 or 1. A guardrail now pulls grounded
+  confidence towards 0.5 when most of the article's words are unseen in
+  training; the strength (0.4) was chosen on that same set, so its gain there
+  (50.2 → 58.2 with both guardrails) is optimistic.
 * **Noisy routing labels.** Confident routing "errors" are mostly mislabels
   ("Package not delivered" labelled billing). They cap accuracy near 90% for
   any model; our probabilities top out around 0.95 rather than 0.99. Measured

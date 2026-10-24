@@ -1,0 +1,162 @@
+{
+ "req-900001": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900002": {
+  "ticket": "plain",
+  "grounded": "number"
+ },
+ "req-900003": {
+  "ticket": "typos",
+  "grounded": "paraphrase"
+ },
+ "req-900004": {
+  "ticket": "plain",
+  "grounded": "place"
+ },
+ "req-900005": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900006": {
+  "ticket": "redflag-paraphrase",
+  "grounded": "day"
+ },
+ "req-900007": {
+  "ticket": "redflag-paraphrase",
+  "grounded": "paraphrase"
+ },
+ "req-900008": {
+  "ticket": "multi-issue",
+  "grounded": "role"
+ },
+ "req-900009": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900010": {
+  "ticket": "plain",
+  "grounded": "number"
+ },
+ "req-900011": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900012": {
+  "ticket": "emoji",
+  "grounded": "time"
+ },
+ "req-900013": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900014": {
+  "ticket": "plain",
+  "grounded": "condition-dropped"
+ },
+ "req-900015": {
+  "ticket": "caps",
+  "grounded": "paraphrase"
+ },
+ "req-900016": {
+  "ticket": "thread",
+  "grounded": "number"
+ },
+ "req-900017": {
+  "ticket": "plain",
+  "grounded": "cross-unit"
+ },
+ "req-900018": {
+  "ticket": "plain",
+  "grounded": "channel"
+ },
+ "req-900019": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900020": {
+  "ticket": "plain",
+  "grounded": "scope"
+ },
+ "req-900021": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900022": {
+  "ticket": "redflag-paraphrase",
+  "grounded": "who-pays"
+ },
+ "req-900023": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900024": {
+  "ticket": "typos",
+  "grounded": "place"
+ },
+ "req-900025": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900026": {
+  "ticket": "plain",
+  "grounded": "number"
+ },
+ "req-900027": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900028": {
+  "ticket": "plain",
+  "grounded": "date"
+ },
+ "req-900029": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900030": {
+  "ticket": "plain",
+  "grounded": "contradiction"
+ },
+ "req-900031": {
+  "ticket": "redflag-literal",
+  "grounded": "long-kb"
+ },
+ "req-900032": {
+  "ticket": "plain",
+  "grounded": "long-kb-number"
+ },
+ "req-900033": {
+  "ticket": "plain",
+  "grounded": "one-sentence-kb"
+ },
+ "req-900034": {
+  "ticket": "plain",
+  "grounded": "extra-promise"
+ },
+ "req-900035": {
+  "ticket": "plain",
+  "grounded": "paraphrase-unit"
+ },
+ "req-900036": {
+  "ticket": "plain",
+  "grounded": "contradiction"
+ },
+ "req-900037": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900038": {
+  "ticket": "plain",
+  "grounded": "platform"
+ },
+ "req-900039": {
+  "ticket": "plain",
+  "grounded": "paraphrase"
+ },
+ "req-900040": {
+  "ticket": "mixed-language",
+  "grounded": "condition-swapped"
+ }
+}
