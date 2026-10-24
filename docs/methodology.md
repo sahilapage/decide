@@ -396,6 +396,11 @@ OOF predictions or the same dev halves:
 * Losses that up-weight hard examples (focal) or flatten confidence (GCE)
   hurt, because the hard examples here are mostly mislabelled.
 * All of this confirms the ceiling analysis.
+* A second run of the same losses on the shipped recipe (grounded
+  augmentation and the approve tree stage, `docs/report.md` #21–22) found GCE
+  slightly *positive* (+0.24, about 1σ) and GCE + layer-wise LR decay +0.29.
+  So the sign of GCE depends on the setup; in neither setup is the gain large
+  enough to ship.
 
 ---
 

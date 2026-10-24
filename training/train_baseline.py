@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
 import json
 import pickle
-import time
 
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
@@ -50,7 +49,6 @@ def main():
     score(tr, pol.responses(oof_r, oof_a, oof_g), verbose=True)
 
     m = BaselineModel().fit(tr)
-    t0 = time.perf_counter()
     r, a, g = m.logits([x["state"] for x in dv])
     print("DEV:")
     score(dv, pol.responses(r, a, g), verbose=True)

@@ -121,6 +121,13 @@ Approve commits to "yes" only when p > 0.75, where 3·(1−p) < p.
   tier's cap (free ≈ $20–30, pro ≈ $100–120, enterprise ≈ $375–400) and ~15%
   of requests well under the cap are refused for account-history reasons the
   ticket never shows. Accuracy there is near a coin flip; the model says so.
+* **Round dollar amounts the training text only saw refused.** 99% of training
+  amounts have cents (47 of 5,228 are whole dollars), and the only training
+  tickets that mention "$140" or "$200" in their text were refused. The model
+  has picked that up from the amount it reads in the prompt: an enterprise
+  refund of $200.00–$200.99 gets p ≈ 0.05–0.10 (hold) while $199.99 or $205 get
+  p ≈ 0.85; $100 and $140 are pulled down to the abstain zone. Rare in data
+  that looks like the training set; visible in `docs/figures/15_approve_curve.png`.
 * **Paraphrased refusal reasons.** The disqualifying phrases are learned from
   the training templates; a hand-written paraphrase ("I'll file a chargeback
   with my card company") is not always recognised and can be auto-approved
