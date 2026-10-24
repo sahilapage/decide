@@ -33,49 +33,38 @@ calls and no API keys.
 
 ## Results
 
-<!-- RESULTS:START -->
-| Public dev split, `selfcheck.py` against the live service | |
-|---|---|
-| **Total score** | **85.9 / 100** (cross-fitted estimate 85.1; gate-1 baseline 77.0) |
-| route | accuracy 0.891 · macro-F1 on answered 0.946 · answers 85% |
-| approve | accuracy 0.899 · cost 0.201 vs 0.405 for “always hold” · answers 90% |
-| grounded | accuracy 1.000 · macro-F1 1.000 · answers 100% |
-| calibration | mean ECE 0.014 · Brier skill 0.821 |
-| latency | p95 6.4 ms over HTTP, mean of the 3 decisions (4 logical CPUs) |
-| robustness | worst of 14 rewritten versions of dev: 78.8 (un-augmented model: 65.2) |
-| hand-written tests | complex queries 29 / 31 · judge-style tickets 25 / 33 |
-<!-- RESULTS:END -->
+`selfcheck.py` on `data/dev.jsonl` (1500 records, 4500 calls). Full output in `results.json`.
 
-<p align="center">
-  <img src="docs/figures/1_score_vs_ceiling.png" alt="Score per part against the data's ceiling" width="49%">
-  <img src="docs/figures/2_score_progression.png" alt="From 77 to 85.9" width="49%">
-</p>
+| Part | Score | Weight | Points |
+|---|---|---|---|
+| Quality | 0.856 | 40% | 34.26 |
+| Calibration | 0.876 | 25% | 21.90 |
+| Latency (p95 5.2 ms) | 1.000 | 20% | 20.00 |
+| Abstention | 0.647 | 15% | 9.71 |
+| **Total** | | | **85.87 / 100** |
 
-The score is about one point below what this data allows any model to reach (~87; see
-[`docs/ceiling.md`](docs/ceiling.md)). Latency is already at full marks. What is left is label noise,
-explained [below](#limits-and-the-ceiling).
-
-**Why two totals?** 85.9 is the official selfcheck from a fresh clone. The network weights never see dev,
-but a few calibration scales and the abstain thresholds are fitted on it. So we also report **85.1**,
-which fits those on one half of dev and scores the other half, 10 times over. Expect about 85 on unseen
-data from the same source.
+All gates pass: schema 4500 / 4500 valid, reachable, latency under 100 ms.
 
 ---
 
 ## Quick start
 
+Start the service (one command, on a clean 4-core Linux box with Python 3.10+):
+
 ```bash
-./start.sh                                                   # serve the graded API on 0.0.0.0:8000
-python selfcheck.py --url http://localhost:8000/v1/decide    # the judges' own check
-python test.py                                               # any dataset in-process: answers, timing, score
+./start.sh
 ```
 
-* `start.sh` creates `.venv`, installs the five serving packages and starts uvicorn. Needs Python 3.10+
-  on a CPU-only Linux box.
-* **Offline:** if PyPI is unreachable it falls back to prebuilt wheels from this repo’s `wheels-v1`
-  release (`OFFLINE=1 ./start.sh` forces it). No `python3-venv`? It falls back to `virtualenv`.
-* The model ships in the repo (`artifacts/student/`, 68 MB, in <100 MB chunks joined in memory).
-  A restart with packages installed is up in about 2 s.
+It runs the starter kit's two steps, `pip install -r requirements.txt` then
+`uvicorn app:app --host 0.0.0.0 --port 8000`. The service listens on port **8000**.
+
+In a second terminal, while the server is running:
+
+```bash
+python selfcheck.py --url http://localhost:8000/v1/decide
+```
+
+The weights ship in the repo (`artifacts/student/`, 68 MB), so nothing has to be downloaded or trained.
 
 ### The API
 
@@ -192,7 +181,7 @@ the judges’ code.
 ```
 </details>
 
-**Adding a fourth decision is cheap, and we measured it** ([`docs/extensibility.md`](docs/extensibility.md)).
+**Adding a fourth decision is cheap, and we measured it**.
 We trained on route and approve only, then added grounded later as if it were new: one prompt, one head,
 **89 s** of training with old batches replayed. It scored **83.2** against **83.6** for training all three
 together (noise ±1.1), and route and approve kept their accuracy.
@@ -314,8 +303,6 @@ label-preserving ways (`tools/stress_test.py`) and wrote 64 hard tickets by hand
 | Approve features inside the network instead of the tree layer (v7, v8) | no better: the network memorises the hidden refusals |
 | Noise-robust losses, R-Drop, LLRD, attention pooling, L2-SP | within noise or worse |
 | More training data (5,000 → 6,500 tickets) | +0.8, the one thing that still helps |
-
-Every experiment, with its baseline and conclusion, is in [`docs/report.md`](docs/report.md).
 </details>
 
 ---
@@ -334,7 +321,6 @@ python tools/fit_approve_stage.py runs/v6t2_e17 runs/v6t2h_e17_s3         # tree
 python tools/embed_stage.py exports/v6t2h_s3_st --check data/dev.jsonl    # trees into the ONNX graph
 python training/pack_student.py exports/v6t2h_s3_st exports/v6t2h_s3_st/policy.json
 python tools/stress_test.py                                               # shifted-dev robustness check
-python tools/figure_data.py && python tools/make_figures.py               # every figure in this README
 ```
 
 Run everything from the repository root. `training/train_baseline.py` takes no arguments and overwrites
@@ -346,7 +332,7 @@ Run everything from the repository root. `training/train_baseline.py` takes no a
 .
 ├── app.py              HTTP layer from the starter kit (fixed API contract)
 ├── model.py            DecisionModel: loads the shipped model and its policy
-├── start.sh            one command to install and serve
+├── start.sh            installs requirements and starts the server on :8000
 ├── selfcheck.py        the judges' check (schema, latency, score) against a live URL
 ├── test.py             any dataset in-process: answers, timing, accuracy, score
 ├── decide/             the model code
@@ -360,10 +346,10 @@ Run everything from the repository root. `training/train_baseline.py` takes no a
 │   └── scoring.py          in-process copy of the selfcheck maths
 ├── artifacts/          the shipped model (student/) and the gate-1 baseline
 ├── training/           training, calibration, export and packing
-├── tools/              stress tests, hand-written cases, benchmarks, ceiling analysis, figures
+├── tools/              stress test, hand-written cases, CPU benchmark, ONNX build helpers
 ├── tests/              hand-written judge-style and complex-query cases
 ├── demo/               live demo page and terminal demo
-└── docs/               methodology, robustness, ceiling, extensibility, benchmarks, figures
+└── docs/               methodology, figures, demo screenshots
 ```
 
 ## Pretrained components and licences
@@ -393,12 +379,5 @@ Run everything from the repository root. `training/train_baseline.py` takes no a
 |---|---|
 | [`docs/methodology.md`](docs/methodology.md) | every stage from the baseline to 85.9, with numbers |
 | [`model_card.md`](model_card.md) | intended use, metrics, when it abstains, where it fails |
-| [`docs/report.md`](docs/report.md) | decision matrix, experiment tracker, error analysis |
-| [`docs/robustness.md`](docs/robustness.md) | stress tests on shifted text, and the fixes |
-| [`docs/ceiling.md`](docs/ceiling.md) | how high this data lets any model score (~87), and why |
-| [`docs/extensibility.md`](docs/extensibility.md) | adding a fourth decision, measured |
-| [`docs/benchmarks.md`](docs/benchmarks.md) | CPU latency, and why int8 is not shipped |
-| [`docs/demo_script.md`](docs/demo_script.md) | the three-minute demo and likely questions |
-| [`docs/STARTER_README.md`](docs/STARTER_README.md) | the original starter-kit README |
 
 <p align="center"><sub>Built in 12 hours by Sahil (<code>sahilapage</code>) and Arhan (<code>4rhan</code>) for the Decide hackathon.</sub></p>
