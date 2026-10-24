@@ -24,13 +24,48 @@ request names one decision; the same weights answer all three.
   ONNX Runtime fp32, 4 threads, one request at a time. No GPU, no network.
 * Size: 17M parameters, 68 MB.
 
+### How a request flows through the model
+
+```mermaid
+flowchart TD
+    A["Request<br/>ticket + which decision: route, approve or grounded"]
+    B["Clean the text<br/>e.g. 'two weeks' becomes '14 days'"]
+    C["Shared encoder: Ettin-17M<br/>ONE model reads the text for all three decisions"]
+
+    D["Route head<br/>which queue: billing, technical,<br/>account, shipping, general"]
+    E["Approve head + tree layer<br/>refund amount vs the tier's limit"]
+    F["Grounded head + fact checks<br/>do the draft's numbers match the article?"]
+
+    G["Calibrate<br/>turn scores into honest probabilities"]
+    H{"Confident<br/>enough?"}
+    I["Answer<br/>value + probability"]
+    J["Abstain<br/>send to a human"]
+
+    A --> B --> C
+    C --> D
+    C --> E
+    C --> F
+    D --> G
+    E --> G
+    F --> G
+    G --> H
+    H -- yes --> I
+    H -- no --> J
+```
+
+In words: every request goes through the **same encoder** (this is where the
+sharing happens). A small head per decision turns the encoder output into a
+score. Calibration turns that score into a probability you can trust. If the
+probability is too uncertain, the model abstains and a human decides. Approve
+only says "yes" when p > 0.75, because a wrong "yes" costs 3× a wrong "no".
+
 ## Training data
 The provided labelled split only: 6,500 train tickets with all three labels.
 No external data, no LLM-generated data and no new labels. Dev (1,500) is
 never used to fit network weights or the approve tree layer (fitted on train
 out-of-fold logits). It is used to (a) refit three calibration scales and the
 abstain thresholds for the shipped network, (b) pick one of two training seeds,
-and (c) compare candidate recipes (`docs/report.md`) and sanity-check feature
+and (c) compare candidate recipes (see `docs/methodology.md`) and sanity-check feature
 rules. So the in-sample dev score is optimistic; the cross-fitted estimate
 corrects only (a), and ~84.5–85 is the honest expectation on unseen data.
 
@@ -65,7 +100,7 @@ better of two, so treat ~84.5–85 as the expectation on unseen data.
 p95 latency per call: 6.3 ms over HTTP on 4 logical CPUs (two physical cores of
 an i9-13900K, the shape of a 4-vCPU VM); about 2.5 ms on an Apple M5.
 
-Robustness (`tools/stress_test.py`, `docs/robustness.md`): the same dev tickets
+Robustness (`tools/stress_test.py`): the same dev tickets
 rewritten with typos, reordered or extra KB sentences, case changes, number
 words, ticket references in the draft, one-sentence KB articles, etc. Worst
 variant 78.8 (the un-augmented model fell to 65.2). Hand-written judge-style
@@ -127,7 +162,7 @@ Approve commits to "yes" only when p > 0.75, where 3·(1−p) < p.
   has picked that up from the amount it reads in the prompt: an enterprise
   refund of $200.00–$200.99 gets p ≈ 0.05–0.10 (hold) while $199.99 or $205 get
   p ≈ 0.85; $100 and $140 are pulled down to the abstain zone. Rare in data
-  that looks like the training set; visible in `docs/figures/15_approve_curve.png`.
+  that looks like the training set.
 * **Paraphrased refusal reasons.** The disqualifying phrases are learned from
   the training templates; a hand-written paraphrase ("I'll file a chargeback
   with my card company") is not always recognised and can be auto-approved
@@ -137,8 +172,7 @@ Approve commits to "yes" only when p > 0.75, where 3·(1−p) < p.
   any model; our probabilities top out around 0.95 rather than 0.99. Measured
   out-of-fold: the most confident 10% of tickets are wrong 5.5% of the time,
   the same as the most confident 80% (5.7%) — a flat floor no confidence signal
-  can rank, so route abstention sits within 0.01 of its ceiling
-  (`tools/ceilings.py`, `docs/ceilings.json`).
+  can rank, so route abstention sits within 0.01 of its ceiling.
 * **Grounding outside the templates.** The number and scope checks assume the
   conventions of this help desk (a month = 30 days). They tolerate one-letter
   typos and ignore numbers copied from the ticket (order IDs, the charged

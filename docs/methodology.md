@@ -92,7 +92,7 @@ would learn the network's over-confidence on its own training data.
      a scope ("monthly" vs "annual").
    * After normalising numbers and units, **no correct draft in train or dev
      states a number + unit that its article doesn't contain.**
-4. **Together these set a ceiling of roughly 87** (`docs/ceiling.md`), so
+4. **Together these set a ceiling of roughly 87**, so
    beyond a point the remaining gains come from calibration, abstention and
    robustness, not raw accuracy.
 
@@ -229,8 +229,7 @@ scorer (`decide/scoring.py`, built from `selfcheck.py`'s own functions):
 
 ## 8. Stage 6: model size and latency (85.22)
 
-**Measurements** (`tools/latency_sweep.py`, `tools/bench_cpu.py`,
-`tools/quant_eval.py`; `docs/benchmarks.md`). p95 is the mean over the three
+**Measurements** (`tools/bench_cpu.py`). p95 is the mean over the three
 decisions, in-process, with the CPU pinned to 2 physical cores:
 
 | Model | p95 | Cross-fitted dev |
@@ -397,7 +396,7 @@ OOF predictions or the same dev halves:
   hurt, because the hard examples here are mostly mislabelled.
 * All of this confirms the ceiling analysis.
 * A second run of the same losses on the shipped recipe (grounded
-  augmentation and the approve tree stage, `docs/report.md` #21–22) found GCE
+  augmentation and the approve tree stage) found GCE
   slightly *positive* (+0.24, about 1σ) and GCE + layer-wise LR decay +0.29.
   So the sign of GCE depends on the setup; in neither setup is the gain large
   enough to ship.
@@ -406,7 +405,7 @@ OOF predictions or the same dev halves:
 
 ## 13. Extensibility and data scaling
 
-**Adding a fourth decision** (`docs/extensibility.md`, `tools/extend_eval.py`):
+**Adding a fourth decision**:
 * Leave-one-out: train on route + approve only, then add grounded as if it
   were new (one prompt, one head).
 * Fine-tuning for **89 s** on top of the trained model, replaying 30% of the
@@ -485,5 +484,5 @@ Commands to reproduce are in the README ("Reproduce").
 * **Arhan:** CPU latency work and benchmarks (layouts, threads, int8 study),
   independent verification and reproduction, loss and architecture ablations,
   the extensibility experiment, the complex-query test sets and long-KB fix,
-  the training-size study, `test.py`, the demo page, repository organisation
+  the training-size study, `test.py`, repository organisation
   and figures.

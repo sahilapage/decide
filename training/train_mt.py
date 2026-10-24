@@ -322,7 +322,7 @@ def main():
                     help="attn = learned per-decision attention pooling")
     ap.add_argument("--augment_extra", default="", help="extra augmentation families, e.g. kb_long")
     ap.add_argument("--augment_tasks", default="", help="decisions that see augmented rows, e.g. grounded (default all)")
-    # extending the model with a new decision (see docs/extensibility.md)
+    # extending the model with a new decision
     ap.add_argument("--tasks", default="route,approve,grounded", help="decisions trained in this run")
     ap.add_argument("--init_from", default="", help="model.pt of a trained DecideNet to start from")
     ap.add_argument("--freeze_encoder", action="store_true", help="train heads only; other decisions stay bit-identical")
