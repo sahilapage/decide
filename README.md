@@ -298,6 +298,7 @@ fastapi 0.161, torch 2.8 (training), transformers 5.20 (training).
 
 | Doc | What it covers |
 |---|---|
+| `docs/methodology.md` | **how we got here: every stage from the baseline to 85.9, with numbers** |
 | `model_card.md` | intended use, metrics, limits |
 | `docs/robustness.md` | stress tests on shifted text, and the fixes |
 | `docs/ceiling.md` | how high this data lets any model score (~87), and why |
