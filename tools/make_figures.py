@@ -276,6 +276,87 @@ def losses():
     save(fig, "8_losses.png")
 
 
+def complex_queries():
+    # shipped model with and without the long-KB focus (decide/textfmt.py focus_kb), same rewritten dev
+    # sets from tools/stress_test.py --only ...; docs/robustness.md round 3
+    rows = [("clean dev", 85.74, 85.74), ("ticket inside an email thread", 85.74, 85.74),
+            ("longer ticket body", 86.54, 86.54), ("one extra KB sentence", 84.30, 84.30),
+            ("two issues in one ticket", 83.72, 83.72), ("long KB article (7-9 sentences)", 78.57, 81.44),
+            ("all of the above at once", 76.35, 80.89)]
+    fig, ax = figure("Complex queries: long KB articles fixed at inference, nothing else moves",
+                     "Shipped model on dev tickets rewritten to be longer and messier (label-preserving). "
+                     "The fix only activates for KB articles longer than any in training, so clean inputs "
+                     "are byte-identical (selfcheck unchanged at 85.87; 85.74 here only because calls run in dataset order, not selfcheck's shuffled order).")
+    y = np.arange(len(rows))[::-1]
+    for yi, (name, a, b) in zip(y, rows):
+        ax.plot([a, b], [yi, yi], color=GRID, lw=3, zorder=1, solid_capstyle="round")
+    ax.scatter([r[1] for r in rows], y, s=90, color=ORANGE, edgecolor=SURFACE, linewidth=2, zorder=3,
+               label="without the fix")
+    ax.scatter([r[2] for r in rows], y, s=90, color=BLUE, edgecolor=SURFACE, linewidth=2, zorder=4,
+               label="with long-KB focus")
+    for yi, (name, a, b) in zip(y, rows):
+        txt = "+%.1f" % (b - a) if b - a > 0.05 else "unchanged"
+        ax.text(max(a, b) + 0.35, yi, txt, va="center", fontsize=12, color=INK2,
+                fontweight="bold" if b - a > 0.05 else "normal")
+    ax.set_yticks(y, [r[0] for r in rows], fontsize=13, color=INK)
+    ax.set_xlim(74, 90)
+    ax.set_xlabel("total score / 100")
+    ax.grid(axis="y", visible=False)
+    ax.legend(loc="lower right")
+    save(fig, "9_complex_queries.png")
+
+
+def training_data():
+    # same shipped pipeline (augmentation, seed 3, approve stage, calibration) on 5,000 vs all 6,500
+    # train tickets, scored on the same dev split, policy cross-fitted over 10 halves
+    rows = [("5,000 train tickets", 84.26), ("6,500 train tickets\n(the shipped recipe)", 85.05)]
+    fig, ax = figure("More training data still helps: +0.8 for 1,500 more tickets",
+                     "Full shipped pipeline retrained from scratch on each training size; dev total, cross-fitted. "
+                     "One seed per size, so treat +0.8 as indicative. The 6,500 run reproduces the shipped "
+                     "model (85.1).")
+    x = np.arange(len(rows))
+    for xi, (name, v) in zip(x, rows):
+        ax.bar(xi, v - 80, bottom=80, width=0.45, color=BLUE if xi == 1 else "#9ec5f4", zorder=2)
+        ax.text(xi, v + 0.12, "%.2f" % v, ha="center", va="bottom", fontsize=16, fontweight="bold", color=INK)
+    ax.set_xticks(x, [r[0] for r in rows], fontsize=14, color=INK)
+    ax.set_ylim(80, 87)
+    ax.set_xlim(-0.7, 1.7)
+    ax.set_ylabel("dev total / 100 (axis starts at 80)")
+    ax.grid(axis="x", visible=False)
+    ax.annotate("", xy=(1, 85.6), xytext=(0, 84.8), arrowprops=dict(arrowstyle="->", color=INK2, lw=1.5))
+    ax.text(0.5, 85.55, "+0.79", ha="center", va="bottom", fontsize=14, color=INK2, fontweight="bold")
+    save(fig, "10_training_data.png")
+
+
+def approve_stage():
+    # Sahil's approve second stage (decide/approve_stage.py): 60 boosted trees on the network's approve
+    # logit + amount/cap + phrase flags, fitted on out-of-fold logits, compiled into the ONNX graph.
+    # Numbers from commit 27c82a6 and README.
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 6.75), dpi=160)
+    fig.suptitle("Approve second stage: +1.8 points of approve accuracy, +1.0 on the total",
+                 x=0.06, ha="left", fontsize=20, fontweight="bold", color=INK)
+    panels = [(a1, "approve accuracy, out-of-fold (%)", [88.5, 90.3], 86, 92, "%.1f%%"),
+              (a2, "total score, dev, cross-fitted", [84.1, 85.1], 82, 87, "%.1f")]
+    for ax, label, vals, lo, hi, fmt in panels:
+        ax.set_axisbelow(True)
+        for xi, v in enumerate(vals):
+            ax.bar(xi, v - lo, bottom=lo, width=0.5, color=BLUE if xi else "#9ec5f4", zorder=2)
+            ax.text(xi, v + (hi - lo) * 0.015, fmt % v, ha="center", va="bottom", fontsize=16,
+                    fontweight="bold", color=INK)
+        ax.set_xticks([0, 1], ["network only", "+ tree stage"], fontsize=13, color=INK)
+        ax.set_ylim(lo, hi)
+        ax.set_xlim(-0.6, 1.6)
+        ax.set_title(label, fontsize=14, fontweight="normal", color=INK2, loc="left")
+        ax.grid(axis="x", visible=False)
+    fig.text(0.06, -0.02, textwrap.fill(
+        "60 boosted trees refine the shared network's approve logit using amount ÷ tier cap and the "
+        "disqualifying-phrase flags. Fitted on out-of-fold logits and compiled into the same ONNX graph "
+        "(still one model, ~0.1 ms). Axes start above zero to show the change.", 125),
+        color=MUTED, fontsize=11, va="top")
+    fig.subplots_adjust(top=0.84, wspace=0.25, left=0.06, right=0.98)
+    save(fig, "11_approve_stage.png")
+
+
 if __name__ == "__main__":
     score_vs_ceiling()
     score_progression()
@@ -285,3 +366,6 @@ if __name__ == "__main__":
     approve_soft_cap()
     extensibility()
     losses()
+    complex_queries()
+    training_data()
+    approve_stage()
