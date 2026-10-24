@@ -474,7 +474,7 @@ Commands to reproduce are in the README ("Reproduce").
 
 ## 17. Team
 
-* **Sahil Apage:** models and training recipe, data analysis, calibration and
+* **Sahil:** models and training recipe, data analysis, calibration and
   abstention policy, robustness augmentation, approve second stage, ceiling
   analysis, stress and judge-case suites, serving hardening.
 * **Arhan:** CPU latency work and benchmarks (layouts, threads, int8 study),
