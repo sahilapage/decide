@@ -18,10 +18,10 @@ with calibrated probabilities and an abstain flag.
 | Part | Score | Weight | Points |
 |---|---|---|---|
 | Quality | 0.856 | 40% | 34.26 |
-| Calibration | 0.876 | 25% | 21.90 |
-| Latency (p95 5.2 ms) | 1.000 | 20% | 20.00 |
+| Calibration | 0.877 | 25% | 21.91 |
+| Latency (p95 6.6 ms) | 1.000 | 20% | 20.00 |
 | Abstention | 0.647 | 15% | 9.71 |
-| **Total** | | | **85.87 / 100** |
+| **Total** | | | **85.88 / 100** |
 
 All gates pass: schema 4500 / 4500 valid, reachable, latency under 100 ms.
 
