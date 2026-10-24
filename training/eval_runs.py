@@ -1,12 +1,17 @@
 """
 Combine fold outputs of one or more runs, fit the policy, score.
 
-  python eval_runs.py runs/e32                 # one run
-  python eval_runs.py runs/a runs/b --save_soft runs/teacher_soft.npz   # ensemble -> teacher targets
+  python training/eval_runs.py runs/e32                 # one run
+  python training/eval_runs.py runs/a runs/b --save_soft runs/teacher_soft.npz   # ensemble -> teacher targets
 
 Logits of several runs are averaged (route in log-prob space, binaries in
 logit space). Dev logits are the mean over the fold models.
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import glob

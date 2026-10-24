@@ -1,14 +1,19 @@
 """
 Multi-task fine-tuning of one shared encoder on all three decisions.
 
-  python train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32 --folds 5
-  python train_mt.py --model ... --out runs/e32_full --full          # final fit on all train
+  python training/train_mt.py --model jhu-clsp/ettin-encoder-32m --out runs/e32 --folds 5
+  python training/train_mt.py --model ... --out runs/e32_full --full          # final fit on all train
 
 Per fold it writes the out-of-fold logits (used to fit calibration and, for
 teachers, as distillation targets) and dev logits. With --soft, the route,
 approve and grounded targets are blended with a teacher's out-of-fold
 probabilities (knowledge distillation).
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import contextlib

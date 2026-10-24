@@ -2,8 +2,13 @@
 Copy an exported student into artifacts/student, splitting the ONNX file into
 <100MB chunks (GitHub's per-file limit). The runtime rejoins them in memory.
 
-  python pack_student.py exports/e32 path/to/policy.json [--variant model.onnx]
+  python training/pack_student.py exports/e32 path/to/policy.json [--variant model.onnx]
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import json

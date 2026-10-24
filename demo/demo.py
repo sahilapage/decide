@@ -2,7 +2,7 @@
 """
 Three-minute live demo against the running service.
 
-  python demo.py [--url http://localhost:8000/v1/decide]
+  python demo/demo.py [--url http://localhost:8000/v1/decide]
 
 1. A normal ticket: all three decisions from the one model, with latency.
 2. A case where it correctly refuses to answer (vague ticket -> abstain).
@@ -10,6 +10,11 @@ Three-minute live demo against the running service.
 4. Approval near a tier's amount cap, where the 3:1 cost rule holds back.
 5. A hand-typed, off-template ticket (what a judge might type) still works.
 """
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root
 
 import argparse
 import http.client
