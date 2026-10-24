@@ -50,32 +50,12 @@ About 99% of the parameters are shared; each decision has only a small head on t
 ## Graphs
 
 <p align="center">
-  <img src="docs/figures/15_approve_curve.png" alt="Approve probability against refund amount per plan" width="100%">
-</p>
-
-<p align="center">
   <img src="docs/figures/13_calibration.png" alt="Calibration: predicted vs actual" width="49%">
   <img src="docs/figures/14_coverage.png" alt="Accuracy against share of tickets answered" width="49%">
 </p>
 
 <p align="center">
-  <img src="docs/figures/6_approve_soft_cap.png" alt="Approval rate against amount / cap per tier" width="49%">
-  <img src="docs/figures/11_approve_stage.png" alt="Tree layer adds approve accuracy" width="49%">
-</p>
-
-<p align="center">
-  <img src="docs/figures/4_robustness.png" alt="Robustness on rewritten tickets" width="49%">
-  <img src="docs/figures/9_complex_queries.png" alt="Hand-written complex queries" width="49%">
-</p>
-
-<p align="center">
-  <img src="docs/figures/5_noise_ceiling.png" alt="Route label noise sets a ceiling" width="49%">
-  <img src="docs/figures/3_latency.png" alt="Latency by model" width="49%">
-</p>
-
-<p align="center">
-  <img src="docs/figures/7_extensibility.png" alt="Adding a fourth decision" width="49%">
-  <img src="docs/figures/8_losses.png" alt="Loss and architecture variants" width="49%">
+  <img src="docs/figures/15_approve_curve.png" alt="Approve probability against refund amount per plan" width="100%">
 </p>
 
 ## Reproduce
